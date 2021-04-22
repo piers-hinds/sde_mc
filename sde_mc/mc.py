@@ -1,5 +1,5 @@
-import torch
 import time
+import numpy as np
 
 
 class MCStatistics:
@@ -45,7 +45,7 @@ def mc_simple(num_trials, sde_solver, payoff, discount=1):
     end = time.time()
 
     mn = payoffs.mean()
-    sd = payoffs.std() / torch.sqrt(torch.tensor(num_trials))
+    sd = payoffs.std() / np.sqrt(num_trials)
     tt = end - start
 
     return MCStatistics(mn, sd, tt, out, payoffs)
