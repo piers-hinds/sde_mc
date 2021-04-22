@@ -5,17 +5,17 @@ import time
 class MCStatistics:
     """A class to store relevant Monte Carlo statistics"""
 
-    def __init__(self, sample_mean, sample_std, time, paths=None, payoffs=None):
+    def __init__(self, sample_mean, sample_std, time_elapsed, paths=None, payoffs=None):
         """
         :param sample_mean: torch.tensor, the mean of the samples
         :param sample_std: torch.tensor, the standard deviation of the samples / sqrt(num_trials)
-        :param time: float, the time taken for the MC simulation
+        :param time_elapsed: float, the time taken for the MC simulation
         :param paths: torch.tensor (optional), the sample paths generated from the SDE
         :param payoffs: torch.tensor (optional), all payoffs generated from the SDE
         """
         self.sample_mean = sample_mean.item()
         self.sample_std = sample_std.item()
-        self.time = time
+        self.time_elapsed = time_elapsed
         self.paths = paths
         self.payoffs = payoffs
 
@@ -25,8 +25,8 @@ class MCStatistics:
         corresponds to a 95% confidence interval
         :return: None, prints output
         """
-        print('Mean: {:.5f}  +/- {:.5f}     Time taken (s): {:.2f}'.format(self.sample_mean,
-                                                                           self.sample_std * num_std, self.time))
+        print('Mean: {:.5f}  +/- {:.5f}     Time taken (s): {:.2f}'.format(self.sample_mean, self.sample_std * num_std,
+                                                                           self.time_elapsed))
 
 
 def mc_simple(num_trials, sde_solver, payoff, discount=1):
