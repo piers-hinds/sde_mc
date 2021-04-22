@@ -77,11 +77,11 @@ class SdeSolver:
         :param bs: int, the batch size (the number of paths computed at one time)
         :return: torch.tensor, the generated paths across batches, time points and dimensions
         """
-        paths = torch.empty(size=(bs, self.num_steps + 1, self.dimension))
-        paths[:, 0] = self.sde.init_value.unsqueeze(0).repeat(bs, 1)
+        paths = torch.empty(size=(bs, self.num_steps + 1, self.dimension), device=self.device)
+        paths[:, 0] = self.sde.init_value.unsqueeze(0).repeat(bs, 1).to(self.device)
         rvs = torch.randn(size=(bs, self.num_steps, self.dimension), device=self.device) * torch.sqrt(self.h)
 
-        t = torch.tensor(0.0)
+        t = torch.tensor(0.0, device=self.device)
         for i in range(self.num_steps):
             paths[:, i + 1] = paths[:, i] + self.sde.drift(t, paths[:, i]) * self.h + \
                      self.sde.diffusion(t, paths[:, i]) * rvs[:, i]
