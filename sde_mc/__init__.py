@@ -1,3 +1,4 @@
+from .version import __version__
 from .sde import Sde, Gbm, SdeSolver
 from .mc import mc_simple, MCStatistics
 from .options import aon_payoff, aon_true
