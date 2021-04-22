@@ -1,17 +1,18 @@
 import numpy as np
+import torch
 from scipy.integrate import quad
+
 
 def aon_payoff(spot, strike):
     """
     Computes the payoff of a binary asset-or-nothing option
 
-    :param spot: the spot price of the asset
-    :param strike: the strike price of the option
-    :return: payoff
+    :param spot: torch.tensor, spot prices of asset
+    :param strike: float, strike price of option
+    :return: torch.tensor, the payoffs
     """
-    if spot >= strike:
-        return spot
-    return 0.0
+    return torch.where(spot >= strike, spot, torch.tensor(0, dtype=spot.dtype))
+
 
 def aon_true(spot, strike, r, vol, time):
     """
