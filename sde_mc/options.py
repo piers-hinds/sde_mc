@@ -11,7 +11,7 @@ def aon_payoff(spot, strike):
     :param strike: float, strike price of option
     :return: torch.tensor, the payoffs
     """
-    return torch.where(spot >= strike, spot, torch.tensor(0, dtype=spot.dtype))
+    return torch.where(spot >= strike, spot, torch.tensor(0, dtype=spot.dtype, device=spot.device))
 
 
 def aon_true(spot, strike, r, vol, time):
