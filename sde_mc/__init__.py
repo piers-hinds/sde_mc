@@ -12,5 +12,5 @@ __all__ = [
     'aon_payoff',
     'aon_true',
     'fit_basis',
-    'plot_basis
+    'plot_basis'
 ]
