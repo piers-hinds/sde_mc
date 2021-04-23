@@ -77,6 +77,8 @@ class SdeSolver:
         :param bs: int, the batch size (the number of paths computed at one time)
         :return: torch.tensor, the generated paths across batches, time points and dimensions
         """
+        assert bs >= 1, "Batch size must at least one"
+        bs = int(bs)
         paths = torch.empty(size=(bs, self.num_steps + 1, self.dimension), device=self.device)
         paths[:, 0] = self.sde.init_value.unsqueeze(0).repeat(bs, 1).to(self.device)
         rvs = torch.randn(size=(bs, self.num_steps, self.dimension), device=self.device) * torch.sqrt(self.h)
