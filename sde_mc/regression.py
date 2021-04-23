@@ -13,7 +13,7 @@ def basis_2(x, t):
     return (x / 2) + x * (x - 2) / (4 * (torch.sqrt((x - 1)**2 / 4 + beta) + torch.sqrt(0.25 + beta)))
 
 
-def basis_3(x):
+def basis_3(x, t):
     return x / (8 + x**2)
 
 
@@ -33,9 +33,9 @@ def d_basis_2(x, t):
     return x.grad
 
 
-def d_basis_3(x):
+def d_basis_3(x, t):
     x.requires_grad = True
-    y = basis_3(x)
+    y = basis_3(x, t)
     y.backward(torch.ones_like(x))
     x.requires_grad = False
     return x.grad
