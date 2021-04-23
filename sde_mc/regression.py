@@ -1,17 +1,44 @@
 import torch
+import numpy as np
 import matplotlib.pyplot as plt
 
 
-def basis_1(x):
-    return torch.ones(x.shape[0], dtype=torch.float64)
+def basis_1(x, t):
+    alpha = 10 * t / 3 + 0.01 * (3 - t) / 3
+    return (torch.atan(alpha * (x - 1)) + torch.atan(alpha)) / np.pi
 
 
-def basis_2(x):
-    return x[:, 0]
+def basis_2(x, t):
+    beta = 0.0001 * t / 3 + 0.005 * (3 - t) / 3
+    return (x / 2) + x * (x - 2) / (4 * (torch.sqrt((x - 1)**2 / 4 + beta) + torch.sqrt(0.25 + beta)))
 
 
 def basis_3(x):
-    return x[:, 0]**2
+    return x / (8 + x**2)
+
+
+def d_basis_1(x, t):
+    x.requires_grad = True
+    y = basis_1(x, t)
+    y.backward(torch.ones_like(x))
+    x.requires_grad = False
+    return x.grad
+
+
+def d_basis_2(x, t):
+    x.requires_grad = True
+    y = basis_2(x, t)
+    y.backward(torch.ones_like(x))
+    x.requires_grad = False
+    return x.grad
+
+
+def d_basis_3(x):
+    x.requires_grad = True
+    y = basis_3(x)
+    y.backward(torch.ones_like(x))
+    x.requires_grad = False
+    return x.grad
 
 
 def fit_basis(x, y, basis):

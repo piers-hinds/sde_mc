@@ -1,5 +1,6 @@
 import time
 import numpy as np
+import torch
 
 
 class MCStatistics:
@@ -29,23 +30,48 @@ class MCStatistics:
                                                                            self.time_elapsed))
 
 
-def mc_simple(num_trials, sde_solver, payoff, discount=1):
+def mc_simple(num_trials, sde_solver, payoff, discount=1, bs=None):
     """A simple Monte Carlo method applied to an SDE
     :param num_trials: int, the number of MC simulations
     :param sde_solver: SdeSolver, the solver for the SDE
     :param payoff: function, a payoff function to be applied to the process at the final time step, it must be able to
     be applied across a torch.tensor
     :param discount: float (optional), a discount factor to be applied to the payoffs
+    :param bs: int, the batch size. When None all trials will be done simultaneously. When a bs is specified the payoffs
+    and paths will not be recorded
     :return: MCStatistics, the relevant statistics from the MC simulation - see MCStatistics class
     """
-    start = time.time()
-    out = sde_solver.euler(bs=num_trials)
-    spots = out[:, sde_solver.num_steps, :].squeeze(-1)
-    payoffs = payoff(spots, 1) * discount
-    end = time.time()
+    if not bs:
+        start = time.time()
+        out = sde_solver.euler(bs=num_trials)
+        spots = out[:, sde_solver.num_steps, :].squeeze(-1)
+        payoffs = payoff(spots, 1) * discount
 
-    mn = payoffs.mean()
-    sd = payoffs.std() / np.sqrt(num_trials)
-    tt = end - start
+        mn = payoffs.mean()
+        sd = payoffs.std() / np.sqrt(num_trials)
+        end = time.time()
+        tt = end - start
 
-    return MCStatistics(mn, sd, tt, out, payoffs)
+        return MCStatistics(mn, sd, tt, out, payoffs)
+    else:
+        remaining_trials = num_trials
+        sample_sum, sample_sum_sq = 0.0, 0.0
+        start = time.time()
+        while remaining_trials:
+            if remaining_trials < bs:
+                bs = remaining_trials
+
+            remaining_trials -= bs
+            out = sde_solver.euler(bs=bs)
+            spots = out[:, sde_solver.num_steps, :].squeeze(-1)
+            payoffs = payoff(spots, 1) * discount
+
+            sample_sum += payoffs.sum()
+            sample_sum_sq += (payoffs**2).sum()
+
+        mn = sample_sum / num_trials
+        sd = torch.sqrt((sample_sum_sq/num_trials - mn**2) * (num_trials / (num_trials-1))) / np.sqrt(num_trials)
+        end = time.time()
+        tt = end-start
+        return MCStatistics(mn, sd, tt)
+
