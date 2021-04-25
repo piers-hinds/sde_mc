@@ -62,7 +62,8 @@ class SdeSolver:
         :param device: string, the device to do the computation on (see torch docs)
         :param seed: int, seed for torch
         """
-        assert len(sde.init_value) == dimension, "The dimension should match the dimension of the SDE's initial value"
+        assert dimension == 1 or len(sde.init_value) == dimension, \
+            "The dimension should match the dimension of the SDE's initial value"
         self.sde = sde
         self.time = time
         self.num_steps = num_steps
@@ -72,16 +73,21 @@ class SdeSolver:
         self.h = torch.tensor(self.time / self.num_steps, device=self.device)
         torch.manual_seed(seed)
 
-    def euler(self, bs=1):
+    def euler(self, bs=1, shared_noise=False):
         """Implements the Euler scheme for SDEs
         :param bs: int, the batch size (the number of paths computed at one time)
+        :param shared_noise: bool, if True uses the same noise for all dimensions
         :return: torch.tensor, the generated paths across batches, time points and dimensions
         """
         assert bs >= 1, "Batch size must at least one"
         bs = int(bs)
         paths = torch.empty(size=(bs, self.num_steps + 1, self.dimension), device=self.device)
         paths[:, 0] = self.sde.init_value.unsqueeze(0).repeat(bs, 1).to(self.device)
-        rvs = torch.randn(size=(bs, self.num_steps, self.dimension), device=self.device) * torch.sqrt(self.h)
+
+        if shared_noise:
+            rvs = torch.randn(size=(bs, self.num_steps, 1), device=self.device) * torch.sqrt(self.h)
+        else:
+            rvs = torch.randn(size=(bs, self.num_steps, self.dimension), device=self.device) * torch.sqrt(self.h)
 
         t = torch.tensor(0.0, device=self.device)
         for i in range(self.num_steps):
