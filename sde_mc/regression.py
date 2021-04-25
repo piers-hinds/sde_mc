@@ -22,7 +22,9 @@ def d_basis_1(x, t):
     y = basis_1(x, t)
     y.backward(torch.ones_like(x))
     x.requires_grad = False
-    return x.grad
+    grad = x.grad
+    x.grad = None
+    return grad
 
 
 def d_basis_2(x, t):
@@ -30,7 +32,9 @@ def d_basis_2(x, t):
     y = basis_2(x, t)
     y.backward(torch.ones_like(x))
     x.requires_grad = False
-    return x.grad
+    grad = x.grad
+    x.grad = None
+    return grad
 
 
 def d_basis_3(x, t):
@@ -38,7 +42,9 @@ def d_basis_3(x, t):
     y = basis_3(x, t)
     y.backward(torch.ones_like(x))
     x.requires_grad = False
-    return x.grad
+    grad = x.grad
+    x.grad = None
+    return grad
 
 
 def fit_basis(x, y, basis):

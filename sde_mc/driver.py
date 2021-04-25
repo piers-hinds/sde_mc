@@ -8,7 +8,7 @@ import time
 import matplotlib.pyplot as plt
 from functools import partial
 
-steps = 1000
+steps = 1
 trials = 1000
 
 gbm = Gbm(mu=0.02, sigma=0.2, init_value=torch.tensor([1.0]))
@@ -17,7 +17,12 @@ solver = SdeSolver(sde=gbm, time=3, num_steps=steps, dimension=1)
 mc_stats = mc_simple(num_trials=trials, sde_solver=solver, payoff=aon_payoff, discount=np.exp(-0.06), bs=None)
 mc_stats.print()
 
+x = torch.tensor([1.])
+print(d_basis_3(x, torch.tensor(0.6)))
+print(d_basis_3(x, torch.tensor(0.6)))
 
+
+"""
 paths = mc_stats.paths
 payoffs = mc_stats.payoffs
 idx = 500
@@ -29,3 +34,4 @@ test = fit_basis(x, payoffs, aon_basis)
 plt.scatter(x, payoffs)
 plot_basis(test, aon_basis, x.min(), x.max())
 plt.show()
+"""
