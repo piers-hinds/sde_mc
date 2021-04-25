@@ -30,7 +30,7 @@ class MCStatistics:
                                                                            self.time_elapsed))
 
 
-def mc_simple(num_trials, sde_solver, payoff, discount=1, bs=None):
+def mc_simple(num_trials, sde_solver, payoff, discount=1, bs=None, shared_noise=False):
     """A simple Monte Carlo method applied to an SDE
     :param num_trials: int, the number of MC simulations
     :param sde_solver: SdeSolver, the solver for the SDE
@@ -39,11 +39,12 @@ def mc_simple(num_trials, sde_solver, payoff, discount=1, bs=None):
     :param discount: float (optional), a discount factor to be applied to the payoffs
     :param bs: int, the batch size. When None all trials will be done simultaneously. When a bs is specified the payoffs
     and paths will not be recorded
+    :param shared_noise: bool, if True uses shared noise in the Euler method - see SdeSolver.euler()
     :return: MCStatistics, the relevant statistics from the MC simulation - see MCStatistics class
     """
     if not bs:
         start = time.time()
-        out = sde_solver.euler(bs=num_trials)
+        out = sde_solver.euler(bs=num_trials, shared_noise=shared_noise)
         spots = out[:, sde_solver.num_steps, :].squeeze(-1)
         payoffs = payoff(spots, 1) * discount
 
@@ -62,7 +63,7 @@ def mc_simple(num_trials, sde_solver, payoff, discount=1, bs=None):
                 bs = remaining_trials
 
             remaining_trials -= bs
-            out = sde_solver.euler(bs=bs)
+            out = sde_solver.euler(bs=bs, shared_noise=shared_noise)
             spots = out[:, sde_solver.num_steps, :].squeeze(-1)
             payoffs = payoff(spots, 1) * discount
 

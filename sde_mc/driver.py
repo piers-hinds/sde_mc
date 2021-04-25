@@ -14,7 +14,7 @@ trials = 1000
 gbm = Gbm(mu=0.02, sigma=0.2, init_value=torch.tensor([1.0, 1.0]))
 solver = SdeSolver(sde=gbm, time=3, num_steps=steps, dimension=2)
 
-mc_stats = mc_simple(num_trials=trials, sde_solver=solver, payoff=aon_payoff, discount=np.exp(-0.06), bs=None)
+mc_stats = mc_simple(num_trials=trials, sde_solver=solver, payoff=aon_payoff, discount=np.exp(-0.06), bs=None, shared_noise=True)
 mc_stats.print()
 
 
