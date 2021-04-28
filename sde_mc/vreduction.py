@@ -1,5 +1,5 @@
-from sde import Sde
-from regression import fit_basis
+from .sde import Sde
+from .regression import fit_basis
 import torch
 from abc import ABC, abstractmethod
 from functools import partial

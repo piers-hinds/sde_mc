@@ -1,8 +1,8 @@
-from options import aon_payoff, aon_true
-from sde import Gbm, SdeSolver
-from mc import mc_simple, mc_control_variate
-from regression import *
-from vreduction import GbmApproximator, SdeControlVariate
+from .options import aon_payoff, aon_true
+from .sde import Gbm, SdeSolver
+from .mc import mc_simple, mc_control_variate
+from .regression import *
+from .vreduction import GbmApproximator, SdeControlVariate
 import torch
 import numpy as np
 import time

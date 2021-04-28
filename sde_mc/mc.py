@@ -1,8 +1,8 @@
 import time
 import numpy as np
 import torch
-from vreduction import SdeControlVariate
-from sde import SdeSolver
+from .vreduction import SdeControlVariate
+from .sde import SdeSolver
 
 
 class MCStatistics:
