@@ -48,7 +48,7 @@ def mc_simple(num_trials, sde_solver, payoff, discount=1, bs=None, shared_noise=
         start = time.time()
         out = sde_solver.euler(bs=num_trials, shared_noise=shared_noise)
         spots = out[:, sde_solver.num_steps, :].squeeze(-1)
-        payoffs = payoff(spots, 1) * discount
+        payoffs = payoff(spots) * discount
 
         mn = payoffs.mean()
         sd = payoffs.std() / np.sqrt(num_trials)
@@ -88,8 +88,8 @@ def mc_control_variate(num_trials, simple_solver, approximator, payoff, discount
     cv_solver = SdeSolver(sde=cv_sde, time=3, num_steps=simple_solver.num_steps*5, dimension=simple_solver.dimension+1,
                           device=simple_solver.device)
 
-    def cv_payoff(spot, strike):
-        return discount * payoff(spot[:, 0], strike) + spot[:, 1]
+    def cv_payoff(spot):
+        return discount * payoff(spot[:, :simple_solver.dimension].squeeze()) + spot[:, simple_solver.dimension]
 
     cv_stats = mc_simple(cv_trials, cv_solver, cv_payoff, discount=1, bs=bs, shared_noise=True)
     return cv_stats
