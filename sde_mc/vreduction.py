@@ -65,7 +65,7 @@ class GbmApproximator(ControlVariateApproximator):
         self.sigma = sigma
 
     def __call__(self, time_idx, t, x):
-        return torch.exp(-self.mu * t) * -self.sigma * self.derivative(time_idx, x)
+        return torch.exp(-self.mu * t) * -self.sigma * x * self.derivative(time_idx, x)
 
 
 class SdeControlVariate(Sde):
