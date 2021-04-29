@@ -8,7 +8,23 @@ import numpy as np
 import time
 import matplotlib.pyplot as plt
 from functools import partial
+from abc import ABC, abstractmethod
 
+
+def exchange_payoff(spot):
+    payoffs = spot[:, 1] - spot[:, 0]
+    return torch.where(payoffs > 0, payoffs, torch.tensor(0., dtype=spot.dtype, device=spot.device))
+
+
+x = torch.tensor([1., 1.])
+my_payoff = partial(aon_payoff, strike=1)
+mu = 0.02
+sigma = 0.2
+cmat = torch.tensor([[1., -0.5], [-0.5, 1.]])
+test = Gbm(mu, sigma, x, dim=2, corr_matrix=cmat)
+solver = SdeSolver(sde=test, time=3, num_steps=1000)
+stats = mc_simple(20000, sde_solver=solver, payoff=exchange_payoff, discount=np.exp(-0.06))
+stats.print()
 
 
 # Example which shows control variates 3x faster

@@ -46,7 +46,7 @@ def mc_simple(num_trials, sde_solver, payoff, discount=1, bs=None, shared_noise=
     """
     if not bs:
         start = time.time()
-        out = sde_solver.euler(bs=num_trials, shared_noise=shared_noise)
+        out = sde_solver.euler(bs=num_trials)
         spots = out[:, sde_solver.num_steps, :].squeeze(-1)
         payoffs = payoff(spots) * discount
 
@@ -65,7 +65,7 @@ def mc_simple(num_trials, sde_solver, payoff, discount=1, bs=None, shared_noise=
                 bs = remaining_trials
 
             remaining_trials -= bs
-            out = sde_solver.euler(bs=bs, shared_noise=shared_noise)
+            out = sde_solver.euler(bs=bs)
             spots = out[:, sde_solver.num_steps, :].squeeze(-1)
             payoffs = payoff(spots, 1) * discount
 

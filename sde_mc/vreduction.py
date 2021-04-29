@@ -79,7 +79,7 @@ class SdeControlVariate(Sde):
         """
         super(SdeControlVariate, self).__init__(torch.cat([base_sde.init_value, torch.tensor([0.])]))
         self.base_sde = base_sde
-        self.base_dim = len(base_sde.init_value)
+        self.base_dim = base_sde.dim
         self.cv = control_variate
         self.time_points = time_points
 
@@ -87,7 +87,7 @@ class SdeControlVariate(Sde):
         self.F = 0
 
     def drift(self, t, x):
-        return torch.cat([self.base_sde.drift(t, x[:, :self.base_dim]), torch.zeros_like(x[:, 1]).unsqueeze(1)], dim=-1)
+        return torch.cat([self.base_sde.drift(t, x[:, :self.base_dim]), torch.zeros_like(x[:, self.base_dim]).unsqueeze(1)], dim=-1)
 
     def diffusion(self, t, x):
         if not t:
