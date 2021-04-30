@@ -77,7 +77,8 @@ class SdeControlVariate(Sde):
         :param control_variate: ControlVariateApproximator, the approximation of F * Y
         :param time_points: torch.tensor, the time points at which to update the control variate
         """
-        super(SdeControlVariate, self).__init__(torch.cat([base_sde.init_value, torch.tensor([0.])]))
+        super(SdeControlVariate, self).__init__(torch.cat([base_sde.init_value, torch.tensor([0.])]), base_sde.dim + 1,
+                                                base_sde.noise_dim, base_sde.corr_matrix)
         self.base_sde = base_sde
         self.base_dim = base_sde.dim
         self.cv = control_variate
@@ -96,13 +97,13 @@ class SdeControlVariate(Sde):
             self.idx += 1
             self.update_control(t, x)
 
-        return torch.cat([self.base_sde.diffusion(t, x[:, :self.base_dim]), self.F], dim=-1)
+        return torch.cat([self.base_sde.diffusion(t, x[:, :self.base_dim]), self.F], dim=1)
 
     def update_control(self, t, x):
         """Updates the control variate"""
-        self.F = self.cv(self.idx, t, x[:, :self.base_dim])
+        self.F = self.cv(self.idx, t, x[:, :self.base_dim]).unsqueeze(1)
 
     def reset_control(self, x):
         """Resets the control variate (e.g. when restarting)"""
-        self.F = torch.zeros_like(x[:, :self.base_dim])
+        self.F = torch.zeros_like(x[:, :self.base_dim]).unsqueeze(1)
         self.idx = 0

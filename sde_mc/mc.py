@@ -32,7 +32,7 @@ class MCStatistics:
                                                                            self.time_elapsed))
 
 
-def mc_simple(num_trials, sde_solver, payoff, discount=1, bs=None, shared_noise=False):
+def mc_simple(num_trials, sde_solver, payoff, discount=1, bs=None):
     """A simple Monte Carlo method applied to an SDE
     :param num_trials: int, the number of MC simulations
     :param sde_solver: SdeSolver, the solver for the SDE
@@ -41,7 +41,6 @@ def mc_simple(num_trials, sde_solver, payoff, discount=1, bs=None, shared_noise=
     :param discount: float (optional), a discount factor to be applied to the payoffs
     :param bs: int, the batch size. When None all trials will be done simultaneously. When a bs is specified the payoffs
     and paths will not be recorded
-    :param shared_noise: bool, if True uses shared noise in the Euler method - see SdeSolver.euler()
     :return: MCStatistics, the relevant statistics from the MC simulation - see MCStatistics class
     """
     if not bs:
@@ -85,11 +84,10 @@ def mc_control_variate(num_trials, simple_solver, approximator, payoff, discount
     simple_stats = mc_simple(simple_trials, simple_solver, payoff, discount)
     approximator.fit(simple_stats.paths, simple_stats.payoffs)
     cv_sde = SdeControlVariate(base_sde=simple_solver.sde, control_variate=approximator, time_points=approximator.ts)
-    cv_solver = SdeSolver(sde=cv_sde, time=3, num_steps=simple_solver.num_steps*5, dimension=simple_solver.dimension+1,
-                          device=simple_solver.device)
+    cv_solver = SdeSolver(sde=cv_sde, time=3, num_steps=simple_solver.num_steps*5, device=simple_solver.device)
 
     def cv_payoff(spot):
-        return discount * payoff(spot[:, :simple_solver.dimension].squeeze()) + spot[:, simple_solver.dimension]
+        return discount * payoff(spot[:, :simple_solver.sde.dim].squeeze()) + spot[:, simple_solver.sde.dim]
 
-    cv_stats = mc_simple(cv_trials, cv_solver, cv_payoff, discount=1, bs=bs, shared_noise=True)
+    cv_stats = mc_simple(cv_trials, cv_solver, cv_payoff, discount=1, bs=bs)
     return cv_stats
