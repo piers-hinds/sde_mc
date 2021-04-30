@@ -26,7 +26,7 @@ class Sde(ABC):
         """YOUR CODE HERE
         :param t: torch.tensor, the current time
         :param x: torch.tensor (bs, dim), the current value of the process
-        :return: torch.tensor (bs, dim), the drift of the process at (t, x)
+        :return: torch.tensor (bs, dim), the drift vector of the process at (t, x)
         """
         pass
 
@@ -35,7 +35,7 @@ class Sde(ABC):
         """YOUR CODE HERE
         :param t: torch.tensor, the current time
         :param x: torch.tensor (bs, dim), the current value of the process
-        :return: torch.tensor (bs, dim), the diffusion of the process at (t, x)
+        :return: torch.tensor (bs, dim, noise_dim), the diffusion matrix of the process at (t, x)
         """
         pass
 
@@ -59,6 +59,36 @@ class Gbm(Sde):
 
     def diffusion(self, t, x):
         return torch.diag_embed(self.sigma * x)
+
+
+class Heston(Sde):
+    """The (log) Heston model under EMM dynamics"""
+
+    def __init__(self, r, kappa, theta, xi, rho, init_value):
+        """
+        :param r: float, the risk-free rate
+        :param kappa: float, mean-reversion rate of the variance process
+        :param theta: float, the long-run mean of the variance process
+        :param xi: float, the vol-of-vol
+        :param rho: float, the correlation between the two Wiener processes
+        :param init_value: torch.tensor (2), the initial spot price and the initial variance
+        """
+        assert 2 * kappa * theta > xi**2, "Feller condition not satisfied"
+        super(Heston, self).__init__(init_value=init_value, dim=2, noise_dim=2,
+                                     corr_matrix=torch.tensor([[1., rho], [rho, 1.]]))
+        self.r = r
+        self.kappa = kappa
+        self.theta = theta
+        self.xi = xi
+
+    def drift(self, t, x):
+        return torch.cat([self.r - 0.5 * torch.exp(x[:, 1]).unsqueeze(1),
+                          ((self.kappa * (self.theta - torch.exp(x[:, 1])) - 0.5*self.xi**2) /
+                           torch.exp(x[:, 1])).unsqueeze(1)], dim=1)
+
+    def diffusion(self, t, x):
+        return torch.diag_embed(torch.cat([torch.sqrt(torch.exp(x[:, 1])).unsqueeze(1),
+                                           self.xi / torch.sqrt(torch.exp(x[:, 1])).unsqueeze(1)], dim=1))
 
 
 class SdeSolver:
