@@ -46,7 +46,7 @@ def mc_simple(num_trials, sde_solver, payoff, discount=1, bs=None):
     if not bs:
         start = time.time()
         out = sde_solver.euler(bs=num_trials)
-        spots = out[:, sde_solver.num_steps, :].squeeze(-1)
+        spots = out[:, sde_solver.num_steps]
         payoffs = payoff(spots) * discount
 
         mn = payoffs.mean()
@@ -87,7 +87,7 @@ def mc_control_variate(num_trials, simple_solver, approximator, payoff, discount
     cv_solver = SdeSolver(sde=cv_sde, time=3, num_steps=simple_solver.num_steps*5, device=simple_solver.device)
 
     def cv_payoff(spot):
-        return discount * payoff(spot[:, :simple_solver.sde.dim].squeeze()) + spot[:, simple_solver.sde.dim]
+        return discount * payoff(spot[:, :simple_solver.sde.dim]) + spot[:, simple_solver.sde.dim]
 
     cv_stats = mc_simple(cv_trials, cv_solver, cv_payoff, discount=1, bs=bs)
     return cv_stats

@@ -1,17 +1,42 @@
 import numpy as np
 import torch
 from scipy.integrate import quad
+from abc import ABC, abstractmethod
 
 
-def aon_payoff(spot, strike):
-    """
-    Computes the payoff of a binary asset-or-nothing option
+class Option(ABC):
+    """Abstract base class for options"""
+    def __init__(self, log=False):
+        self.log = log
 
-    :param spot: torch.tensor, spot prices of asset
-    :param strike: float, strike price of option
-    :return: torch.tensor, the payoffs
-    """
-    return torch.where(spot >= strike, spot, torch.tensor(0, dtype=spot.dtype, device=spot.device))
+    @abstractmethod
+    def __call__(self, x):
+        pass
+
+
+class EuroCall(Option):
+    """European call option"""
+
+    def __init__(self, strike, log=False):
+        super(EuroCall, self).__init__(log)
+        self.strike = strike
+
+    def __call__(self, x):
+        spot = np.exp(x[:, 0]) if self.log else x[:, 0]
+        return torch.where(spot > self.strike, spot - self.strike,
+                           torch.tensor(0., dtype=spot.dtype, device=spot.device))
+
+
+class BinaryAoN(Option):
+    """Binary asset-or-nothing option"""
+
+    def __init__(self, strike, log=False):
+        super(BinaryAoN, self).__init__(log)
+        self.strike = strike
+
+    def __call__(self, x):
+        spot = np.exp(x[:, 0]) if self.log else x[:, 0]
+        return torch.where(spot >= self.strike, spot, torch.tensor(0, dtype=spot.dtype, device=spot.device))
 
 
 def aon_true(spot, strike, r, vol, time):
