@@ -5,16 +5,31 @@ from abc import ABC, abstractmethod
 from functools import partial
 
 
-class ControlVariateApproximator(ABC):
-    """Abstract class for the approximate solutions to the SDEs"""
+class SdeApproximator(ABC):
+    """Abstract base class for an approximator to SDEs"""
 
-    def __init__(self, basis, ts):
+    def __init__(self, time_points):
+        self.time_points = time_points
+
+    @abstractmethod
+    def fit(self, paths, payoffs):
+        pass
+
+    @abstractmethod
+    def __call__(self, time_idx, t, x):
+        pass
+
+
+class LinearApproximator(SdeApproximator):
+    """Abstract class for the approximate solutions to the SDEs using linear regression"""
+
+    def __init__(self, basis, time_points):
         """
         :param basis: list of functions, the basis functions to fit to the data
-        :param ts: torch.tensor, the time points at which the data is observed
+        :param time_points: torch.tensor, the time points at which the data is observed
         """
+        super(LinearApproximator, self).__init__(time_points=time_points)
         self.basis = basis
-        self.ts = ts
         self.coefs = None
 
     def fit(self, paths, payoffs):
@@ -25,7 +40,7 @@ class ControlVariateApproximator(ABC):
         """
         self.coefs = torch.empty((paths.shape[1] - 1, len(self.basis)))
         for i in range(1, paths.shape[1]):
-            current_basis = [partial(b, t=self.ts[i-1]) for b in self.basis]
+            current_basis = [partial(b, t=self.time_points[i-1]) for b in self.basis]
             self.coefs[i-1] = fit_basis(paths[:, i].squeeze(-1), payoffs, current_basis)
 
     def derivative(self, time_idx, x):
@@ -37,7 +52,7 @@ class ControlVariateApproximator(ABC):
         basis_sum = 0
         for i, b in enumerate(self.basis):
             x.requires_grad = True
-            y = b(x, self.ts[time_idx])
+            y = b(x, self.time_points[time_idx])
             y.backward(torch.ones_like(x))
             x.requires_grad = False
             grad = x.grad
@@ -56,16 +71,30 @@ class ControlVariateApproximator(ABC):
         pass
 
 
-class GbmApproximator(ControlVariateApproximator):
+class GbmLinear(LinearApproximator):
     """Approximator for GBM"""
 
-    def __init__(self, basis, ts, mu, sigma):
-        super(GbmApproximator, self).__init__(basis, ts)
+    def __init__(self, basis, time_points, mu, sigma):
+        super(GbmLinear, self).__init__(basis, time_points)
         self.mu = mu
         self.sigma = sigma
 
     def __call__(self, time_idx, t, x):
         return torch.exp(-self.mu * t) * -self.sigma * x * self.derivative(time_idx, x)
+
+
+class NetApproximator(SdeApproximator):
+    """Abstract class for approximate solutions using a feed-forward network"""
+    def __init__(self, time_points, arch):
+        super(NetApproximator, self).__init__(time_points)
+        self.arch = arch
+
+    def fit(self, paths, payoffs):
+        pass
+
+    @abstractmethod
+    def __call__(self, time_idx, t, x):
+        pass
 
 
 class SdeControlVariate(Sde):
@@ -74,7 +103,7 @@ class SdeControlVariate(Sde):
     def __init__(self, base_sde, control_variate, time_points):
         """
         :param base_sde: Sde, the original SDE to add a control variate to
-        :param control_variate: ControlVariateApproximator, the approximation of F * Y
+        :param control_variate: SdeApproximator, the approximation of F * Y
         :param time_points: torch.tensor, the time points at which to update the control variate
         """
         super(SdeControlVariate, self).__init__(torch.cat([base_sde.init_value, torch.tensor([0.])]), base_sde.dim + 1,
