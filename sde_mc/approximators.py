@@ -52,14 +52,13 @@ class LinearApproximator(SdeApproximator):
         :return: torch.tensor, the approximate solution
         """
         basis_sum = 0
+        x.requires_grad = True
         for i, b in enumerate(self.basis):
-            x.requires_grad = True
             y = b(x, self.time_points[time_idx])
             y.backward(torch.ones_like(x))
-            x.requires_grad = False
-            grad = x.grad
+            basis_sum += self.coefs[time_idx, i] * x.grad
             x.grad = None
-            basis_sum += self.coefs[time_idx, i] * grad
+        x.requires_grad = False
         return basis_sum
 
     @abstractmethod
@@ -91,7 +90,8 @@ class Mlp(nn.Module):
         super(Mlp, self).__init__()
         self.num_layers = len(layer_sizes)
 
-        layers = [nn.Linear(input_size, layer_sizes[0]), nn.BatchNorm1d(layer_sizes[0]), nn.ReLU()]
+        layers = [nn.BatchNorm1d(input_size), nn.Linear(input_size, layer_sizes[0]), nn.BatchNorm1d(layer_sizes[0]),
+                  nn.ReLU()]
         for i in range(self.num_layers-1):
             layers += [nn.Linear(layer_sizes[i], layer_sizes[i+1]), nn.BatchNorm1d(layer_sizes[i+1]), nn.ReLU()]
         layers += [nn.Linear(layer_sizes[self.num_layers-1], output_size)]
