@@ -4,3 +4,4 @@ from .mc import *
 from .vreduction import *
 from .options import *
 from .regression import *
+from approximators import *
