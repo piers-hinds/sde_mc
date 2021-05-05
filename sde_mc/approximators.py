@@ -1,4 +1,4 @@
-from regression import fit_basis
+from .regression import fit_basis
 import torch
 import torch.nn as nn
 from abc import ABC, abstractmethod
