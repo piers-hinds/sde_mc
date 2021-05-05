@@ -65,8 +65,8 @@ def mc_simple(num_trials, sde_solver, payoff, discount=1, bs=None):
 
             remaining_trials -= bs
             out = sde_solver.euler(bs=bs)
-            spots = out[:, sde_solver.num_steps, :].squeeze(-1)
-            payoffs = payoff(spots, 1) * discount
+            spots = out[:, sde_solver.num_steps, :]
+            payoffs = payoff(spots) * discount
 
             sample_sum += payoffs.sum()
             sample_sum_sq += (payoffs**2).sum()
