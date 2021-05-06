@@ -78,14 +78,26 @@ def mc_simple(num_trials, sde_solver, payoff, discount=1, bs=None):
         return MCStatistics(mn, sd, tt)
 
 
-def mc_control_variate(num_trials, simple_solver, approximator, payoff, discount, bs=None):
+def mc_control_variate(num_trials, simple_solver, approximator, payoff, discount, step_factor=5, bs=None):
+    """Monte Carlo simulation of an SDE with a control variate
+    :param num_trials: (int, int), the number of trials for the approximation and the number of trials for the
+    control variate monte carlo method
+    :param simple_solver: SdeSolver, the solver for the Sde with no control variate
+    :param approximator: SdeApproximator, the approximator for the solution of the Sde
+    :param payoff: Option, the payoff function applied to the terminal value
+    :param discount: float, the discount to be applied to the payoff
+    :param step_factor: int, the factor to increase the number of steps used in the initial solver
+    :param bs: int, the batch size for the monte carlo method
+    :return:
+    """
     simple_trials, cv_trials = num_trials
     start = time.time()
     simple_stats = mc_simple(simple_trials, simple_solver, payoff, discount)
     approximator.fit(simple_stats.paths, simple_stats.payoffs)
     cv_sde = SdeControlVariate(base_sde=simple_solver.sde, control_variate=approximator,
                                time_points=approximator.time_points)
-    cv_solver = SdeSolver(sde=cv_sde, time=3, num_steps=simple_solver.num_steps*5, device=simple_solver.device)
+    cv_solver = SdeSolver(sde=cv_sde, time=3, num_steps=simple_solver.num_steps*step_factor,
+                          device=simple_solver.device)
 
     def cv_payoff(spot):
         return discount * payoff(spot[:, :simple_solver.sde.dim]) + spot[:, simple_solver.sde.dim]
