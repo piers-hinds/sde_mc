@@ -1,6 +1,8 @@
 from .regression import fit_basis
 import torch
 import torch.nn as nn
+from torch.utils.data import DataLoader, Dataset
+import torch.optim as optim
 from abc import ABC, abstractmethod
 from functools import partial
 
@@ -102,17 +104,61 @@ class Mlp(nn.Module):
         return self.net(x)
 
 
+class PathData(Dataset):
+    def __init__(self, data):
+        super(PathData, self).__init__()
+        self.data = data
+
+    def __len__(self):
+        return len(self.data)
+
+    def __getitem__(self, idx):
+        return self.data[idx, :2], self.data[idx, 2:]
+
+
 class NetApproximator(SdeApproximator):
     """Abstract class for approximate solutions using a feed-forward network"""
 
-    def __init__(self, time_points, arch):
+    def __init__(self, time_points, layer_sizes):
         super(NetApproximator, self).__init__(time_points)
-        self.arch = arch
+        self.time_points = time_points
+        self.mlp = Mlp(2, layer_sizes, 1)
 
     def fit(self, paths, payoffs):
-        pass
+        # First construct data and dataloader
+        data_list = []
+        for idx in range(1, len(self.time_points)):
+            data_list.append(torch.cat(
+                [self.time_points[idx - 1].repeat(paths[:, idx].shape[0]).unsqueeze(1), paths[:, idx],
+                 payoffs.unsqueeze(1)], dim=-1))
+        data_tensor = torch.cat(data_list, dim=0)
+        path_data_set = PathData(data_tensor)
+        dataloader = DataLoader(path_data_set, batch_size=256, drop_last=True, shuffle=True)
 
-    @abstractmethod
+        # Construct optimizer and loss function
+        sgd = optim.SGD(self.mlp.parameters(), lr=0.01)
+        l2_loss = nn.MSELoss()
+
+        # Train model
+        self.train_net(dataloader, sgd, l2_loss, 3)
+
+    def train_net(self, dl, opt, loss_fn, epochs):
+        for epoch in range(epochs):
+            self.mlp.train()
+            running_loss = 0.0
+            for i, (xb, yb) in enumerate(dl):
+                opt.zero_grad()
+                xb = xb.float()
+                yb = yb.float()
+                loss = loss_fn(self.mlp(xb), yb)
+                loss.backward()
+                opt.step()
+        self.mlp.eval()
+
+    # @abstractmethod
     def __call__(self, time_idx, t, x):
-        pass
+        with torch.no_grad():
+            t = t.unsqueeze(-1).repeat(x.shape[0]).unsqueeze(-1)
+            inputs = torch.cat([t, x], dim=1)
+            return self.mlp(inputs)
 

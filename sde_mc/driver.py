@@ -3,7 +3,7 @@ from sde_mc.sde import Gbm, SdeSolver, Sde, Heston
 from sde_mc.mc import mc_simple, mc_control_variate
 from sde_mc.regression import *
 from sde_mc.vreduction import SdeControlVariate
-from sde_mc.approximators import GbmLinear, Mlp
+from sde_mc.approximators import GbmLinear, Mlp, NetApproximator
 import torch
 import numpy as np
 import time
@@ -12,21 +12,32 @@ from functools import partial
 from abc import ABC, abstractmethod
 
 
-x = torch.tensor([[1.], [2.]])
-test = Mlp(1, [10, 20], 1)
-print(test(x))
+steps = 600
+trials = 100
 
+gbm = Gbm(mu=0.02, sigma=0.2, init_value=torch.tensor([1.0]), dim=1)
+solver = SdeSolver(sde=gbm, time=3, num_steps=steps)
 
-# steps = 10
-# trials = 100
-#
-# gbm = Gbm(mu=0.02, sigma=0.2, init_value=torch.tensor([1.0]), dim=1)
-# solver = SdeSolver(sde=gbm, time=3, num_steps=steps)
-#
-# mc_stats = mc_simple(num_trials=trials, sde_solver=solver, payoff=BinaryAoN(strike=1.), discount=np.exp(-0.06))
-# mc_stats.print()
-# paths = mc_stats.paths
-# payoffs = mc_stats.payoffs
+mc_stats = mc_simple(num_trials=trials, sde_solver=solver, payoff=BinaryAoN(strike=1.), discount=np.exp(-0.06))
+mc_stats.print()
+paths = mc_stats.paths
+payoffs = mc_stats.payoffs
+print(paths)
+
+ts = torch.tensor([t * 3 / steps for t in range(1, steps + 1)])
+print(ts)
+net_approx = NetApproximator(time_points=ts, layer_sizes=[10, 10])
+net_approx.fit(paths, payoffs)
+
+x = torch.linspace(0.5, 2, 100).unsqueeze(-1)
+t = torch.tensor(2.)
+# t = t.unsqueeze(-1).repeat(x.shape[0]).unsqueeze(-1)
+# inputs = torch.cat([t, x], dim=1)
+# print(inputs)
+outputs = net_approx(0, t, x)
+plt.plot(x, outputs.detach())
+plt.show()
+
 #
 #
 # idx = 1
