@@ -10,11 +10,20 @@ class MCStatistics:
 
     def __init__(self, sample_mean, sample_std, time_elapsed, paths=None, payoffs=None):
         """
-        :param sample_mean: torch.tensor, the mean of the samples
-        :param sample_std: torch.tensor, the standard deviation of the samples / sqrt(num_trials)
-        :param time_elapsed: float, the time taken for the MC simulation
-        :param paths: torch.tensor (optional), the sample paths generated from the SDE
-        :param payoffs: torch.tensor (optional), all payoffs generated from the SDE
+        :param sample_mean: torch.tensor
+            The mean of the samples
+
+        :param sample_std: torch.tensor
+            The standard deviation of the samples / sqrt(num_trials)
+
+        :param time_elapsed: float
+            The total time taken for the MC simulation
+
+        :param paths: torch.tensor, default = None
+            The sample paths generated from the SDE
+
+        :param payoffs: torch.tensor, default = None
+            All payoffs generated from the SDE
         """
         self.sample_mean = sample_mean.item()
         self.sample_std = sample_std.item()
@@ -24,24 +33,36 @@ class MCStatistics:
 
     def print(self, num_std=2):
         """Prints the mean, confidence interval, and time taken
-        :param num_std: float, the coefficient corresponding to fiducial probabilities - e.g. num_std = 2
-        corresponds to a 95% confidence interval
-        :return: None, prints output
+
+        :param num_std: float
+            The coefficient corresponding to fiducial probabilities - e.g. num_std = 2
+            corresponds to a 95% confidence interval
         """
         print('Mean: {:.5f}  +/- {:.5f}     Time taken (s): {:.2f}'.format(self.sample_mean, self.sample_std * num_std,
                                                                            self.time_elapsed))
 
 
 def mc_simple(num_trials, sde_solver, payoff, discount=1, bs=None):
-    """A simple Monte Carlo method applied to an SDE
-    :param num_trials: int, the number of MC simulations
-    :param sde_solver: SdeSolver, the solver for the SDE
-    :param payoff: function, a payoff function to be applied to the process at the final time step, it must be able to
-    be applied across a torch.tensor
-    :param discount: float (optional), a discount factor to be applied to the payoffs
-    :param bs: int, the batch size. When None all trials will be done simultaneously. When a bs is specified the payoffs
-    and paths will not be recorded
-    :return: MCStatistics, the relevant statistics from the MC simulation - see MCStatistics class
+    """Run Monte Carlo simulations of an SDE
+
+    :param num_trials: int
+        The number of MC simulations
+
+    :param sde_solver: SdeSolver
+        The solver for the SDE
+
+    :param payoff: Option
+        The payoff function applied to the terminal value - see the Option class
+
+    :param discount: float, default = 1
+        A discount factor to be applied to the payoffs
+
+    :param bs: int, default = None
+        The batch size. When None all trials will be done simultaneously. When a bs is specified the payoffs
+        and paths will not be recorded
+
+    :return: MCStatistics
+        The relevant statistics from the MC simulation - see the MCStatistics class
     """
     if not bs:
         start = time.time()
@@ -79,16 +100,32 @@ def mc_simple(num_trials, sde_solver, payoff, discount=1, bs=None):
 
 
 def mc_control_variate(num_trials, simple_solver, approximator, payoff, discount, step_factor=5, bs=None):
-    """Monte Carlo simulation of an SDE with a control variate
-    :param num_trials: (int, int), the number of trials for the approximation and the number of trials for the
-    control variate monte carlo method
-    :param simple_solver: SdeSolver, the solver for the Sde with no control variate
-    :param approximator: SdeApproximator, the approximator for the solution of the Sde
-    :param payoff: Option, the payoff function applied to the terminal value
-    :param discount: float, the discount to be applied to the payoff
-    :param step_factor: int, the factor to increase the number of steps used in the initial solver
-    :param bs: int, the batch size for the monte carlo method
-    :return:
+    """Run Monte Carlo simulation of an SDE with a control variate
+
+    :param num_trials: tuple (int, int)
+        The number of trials for the approximation and the number of trials for the
+        control variate monte carlo method
+
+    :param simple_solver: SdeSolver
+        The solver for the Sde with no control variate
+
+    :param approximator: SdeApproximator
+        The approximator for the solution of the Sde
+
+    :param payoff: Option
+        The payoff function applied to the terminal value - see the Option class
+
+    :param discount: float
+        The discount to be applied to the payoff
+
+    :param step_factor: int
+        The factor to increase the number of steps used in the initial solver
+
+    :param bs: int
+        The batch size for the monte carlo method
+
+    :return: MCStatistics
+        The relevant statistics from the MC simulation - see the MCStatistics class
     """
     simple_trials, cv_trials = num_trials
     start = time.time()
