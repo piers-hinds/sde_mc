@@ -137,7 +137,7 @@ class NetApproximator(SdeApproximator):
         dataloader = DataLoader(path_data_set, batch_size=256, drop_last=True, shuffle=True)
 
         # Construct optimizer and loss function
-        sgd = optim.SGD(self.mlp.parameters(), lr=0.01)
+        sgd = optim.Adam(self.mlp.parameters())
         l2_loss = nn.MSELoss()
 
         # Train model
