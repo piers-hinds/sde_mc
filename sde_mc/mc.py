@@ -136,7 +136,7 @@ def mc_control_variate(num_trials, simple_solver, approximator, payoff, discount
     approximator.fit(simple_stats.paths, simple_stats.payoffs)
     cv_sde = SdeControlVariate(base_sde=simple_solver.sde, control_variate=approximator,
                                time_points=time_points)
-    cv_solver = SdeSolver(sde=cv_sde, time=3, num_steps=simple_solver.num_steps*step_factor,
+    cv_solver = SdeSolver(sde=cv_sde, time=3, num_steps=len(time_points)*step_factor,
                           device=simple_solver.device)
 
     def cv_payoff(spot):
