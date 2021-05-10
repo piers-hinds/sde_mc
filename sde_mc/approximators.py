@@ -93,9 +93,9 @@ class Mlp(nn.Module):
         self.num_layers = len(layer_sizes)
 
         layers = [nn.BatchNorm1d(input_size), nn.Linear(input_size, layer_sizes[0]), nn.BatchNorm1d(layer_sizes[0]),
-                  nn.ReLU()]
+                  nn.Tanh()]
         for i in range(self.num_layers-1):
-            layers += [nn.Linear(layer_sizes[i], layer_sizes[i+1]), nn.BatchNorm1d(layer_sizes[i+1]), nn.ReLU()]
+            layers += [nn.Linear(layer_sizes[i], layer_sizes[i+1]), nn.BatchNorm1d(layer_sizes[i+1]), nn.Tanh()]
         layers += [nn.Linear(layer_sizes[self.num_layers-1], output_size)]
 
         self.net = nn.Sequential(*layers)
@@ -119,10 +119,11 @@ class PathData(Dataset):
 class NetApproximator(SdeApproximator):
     """Abstract class for approximate solutions using a feed-forward network"""
 
-    def __init__(self, time_points, layer_sizes):
+    def __init__(self, time_points, layer_sizes, epochs=3):
         super(NetApproximator, self).__init__(time_points)
         self.time_points = time_points
         self.mlp = Mlp(2, layer_sizes, 1)
+        self.epochs = epochs
 
     def fit(self, paths, payoffs):
         # First construct data and dataloader
@@ -140,7 +141,7 @@ class NetApproximator(SdeApproximator):
         l2_loss = nn.MSELoss()
 
         # Train model
-        self.train_net(dataloader, sgd, l2_loss, 3)
+        self.train_net(dataloader, sgd, l2_loss, self.epochs)
 
     def train_net(self, dl, opt, loss_fn, epochs):
         for epoch in range(epochs):
@@ -170,8 +171,8 @@ class NetApproximator(SdeApproximator):
 
 
 class GbmNet(NetApproximator):
-    def __init__(self, time_points, layer_sizes, mu, sigma):
-        super(GbmNet, self).__init__(time_points, layer_sizes)
+    def __init__(self, time_points, layer_sizes, epochs, mu, sigma):
+        super(GbmNet, self).__init__(time_points, layer_sizes, epochs)
         self.mu = mu
         self.sigma = sigma
 
