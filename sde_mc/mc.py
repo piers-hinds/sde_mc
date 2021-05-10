@@ -99,7 +99,8 @@ def mc_simple(num_trials, sde_solver, payoff, discount=1, bs=None):
         return MCStatistics(mn, sd, tt)
 
 
-def mc_control_variate(num_trials, simple_solver, approximator, payoff, discount, step_factor=5, bs=None):
+def mc_control_variate(num_trials, simple_solver, approximator, payoff, discount, step_factor=5, time_points=None,
+    bs=None):
     """Run Monte Carlo simulation of an SDE with a control variate
 
     :param num_trials: tuple (int, int)
@@ -127,12 +128,14 @@ def mc_control_variate(num_trials, simple_solver, approximator, payoff, discount
     :return: MCStatistics
         The relevant statistics from the MC simulation - see the MCStatistics class
     """
+    if time_points is None:
+        time_points = approximator.time_points
     simple_trials, cv_trials = num_trials
     start = time.time()
     simple_stats = mc_simple(simple_trials, simple_solver, payoff, discount)
     approximator.fit(simple_stats.paths, simple_stats.payoffs)
     cv_sde = SdeControlVariate(base_sde=simple_solver.sde, control_variate=approximator,
-                               time_points=approximator.time_points)
+                               time_points=time_points)
     cv_solver = SdeSolver(sde=cv_sde, time=3, num_steps=simple_solver.num_steps*step_factor,
                           device=simple_solver.device)
 
