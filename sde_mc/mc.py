@@ -140,7 +140,7 @@ def mc_control_variate(num_trials, simple_solver, approximator, payoff, discount
         return discount * payoff(spot[:, :simple_solver.sde.dim]) + spot[:, simple_solver.sde.dim]
 
     cv_stats = mc_simple(cv_trials, cv_solver, cv_payoff, discount=1, bs=bs)
-    print(cv_stats.time_elapsed)
+    print('Time for final MC:', cv_stats.time_elapsed)
     end = time.time()
     cv_stats.time_elapsed = end-start
     return cv_stats

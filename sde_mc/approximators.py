@@ -146,7 +146,7 @@ class NetApproximator(SdeApproximator):
         for epoch in range(epochs):
             self.mlp.train()
             running_loss = 0.0
-            for i, (xb, yb) in enumerate(dl):
+            for xb, yb in dl:
                 opt.zero_grad()
                 xb = xb.float()
                 yb = yb.float()
@@ -155,10 +155,26 @@ class NetApproximator(SdeApproximator):
                 opt.step()
         self.mlp.eval()
 
+    def derivative(self, time_idx, t, x):
+        t = t.unsqueeze(-1).repeat(x.shape[0]).unsqueeze(-1)
+        inputs = torch.cat([t, x], dim=1)
+        inputs.requires_grad = True
+        out = self.mlp(inputs)
+        x_grads = torch.autograd.grad(outputs=out, inputs=inputs, retain_graph=True, grad_outputs=torch.ones_like(
+            out))[0][:, 1:]
+        return x_grads
+
     # @abstractmethod
     def __call__(self, time_idx, t, x):
-        with torch.no_grad():
-            t = t.unsqueeze(-1).repeat(x.shape[0]).unsqueeze(-1)
-            inputs = torch.cat([t, x], dim=1)
-            return self.mlp(inputs)
+        pass
 
+
+class GbmNet(NetApproximator):
+    def __init__(self, time_points, layer_sizes, mu, sigma):
+        super(GbmNet, self).__init__(time_points, layer_sizes)
+        self.mu = mu
+        self.sigma = sigma
+
+    def __call__(self, time_idx, t, x):
+        grads = self.derivative(time_idx, t, x)
+        return torch.exp(-self.mu * t) * -self.sigma * x * grads
