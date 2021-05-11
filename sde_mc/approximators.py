@@ -119,7 +119,7 @@ class PathData(Dataset):
 class NetApproximator(SdeApproximator):
     """Abstract class for approximate solutions using a feed-forward network"""
 
-    def __init__(self, time_points, layer_sizes, device='cpu', epochs=3):
+    def __init__(self, time_points, layer_sizes, device, epochs):
         super(NetApproximator, self).__init__(time_points)
         self.device = device
         self.time_points = time_points
@@ -172,8 +172,8 @@ class NetApproximator(SdeApproximator):
 
 
 class GbmNet(NetApproximator):
-    def __init__(self, time_points, layer_sizes, epochs, mu, sigma):
-        super(GbmNet, self).__init__(time_points, layer_sizes, epochs)
+    def __init__(self, time_points, layer_sizes, mu, sigma, device='cpu', epochs=3):
+        super(GbmNet, self).__init__(time_points, layer_sizes, device, epochs)
         self.mu = mu
         self.sigma = sigma
 
