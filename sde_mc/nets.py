@@ -16,12 +16,20 @@ class Mlp(nn.Module):
             layers += [nn.Linear(layer_sizes[i], layer_sizes[i+1]), nn.BatchNorm1d(layer_sizes[i+1]), nn.Tanh()]
         layers += [nn.Linear(layer_sizes[self.num_layers-1], output_size)]
         if final_activation is not None:
-            layers += [final_activation]
+            layers += [final_activation()]
 
         self.net = nn.Sequential(*layers)
 
     def forward(self, x):
         return self.net(x)
+
+
+class MultiActMlp(Mlp):
+    def __init__(self, input_size, layer_sizes, output_size, final_activation=None):
+        super(MultiActMlp, self).__init__(input_size, layer_sizes, output_size, final_activation)
+
+    def change_activation(self, new_activation, index):
+        setattr(self.net, str(index), new_activation())
 
 
 class PathData(Dataset):

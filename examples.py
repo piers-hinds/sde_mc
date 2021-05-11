@@ -7,37 +7,47 @@ from functools import partial
 from abc import ABC, abstractmethod
 
 
-steps = 600
-trials = 100
+my_net = Mlp(1, [5, 10, 4], 1)
+for child_name, child in my_net.net.named_children():
+    print(child_name, child)
 
-gbm = Gbm(mu=0.02, sigma=0.2, init_value=torch.tensor([1.0]), dim=1)
-solver = SdeSolver(sde=gbm, time=3, num_steps=steps)
+setattr(my_net.net, str(9), nn.ReLU())
+for child_name, child in my_net.net.named_children():
+    print(child_name, child)
 
-mc_stats = mc_simple(num_trials=trials, sde_solver=solver, payoff=BinaryAoN(strike=1.), discount=np.exp(-0.06))
-mc_stats.print()
-paths = mc_stats.paths
-payoffs = mc_stats.payoffs
-
-ts = torch.tensor([t * 3 / steps for t in range(1, steps + 1)])
-
-net_approx = GbmNet(time_points=ts, layer_sizes=[10], mu=0.02, sigma=0.2, final_activation=PosELU(), epochs=3)
-net_approx.fit(paths, payoffs)
-
-lin_approx = GbmLinear(basis=[basis_1, basis_2, basis_3],  time_points=ts,
-                       mu=0.02, sigma=0.2)
-lin_approx.fit(paths, payoffs)
-x = torch.linspace(0.5, 2, 100).unsqueeze(-1)
-t = torch.tensor(2.)
-inputs = torch.cat([t.unsqueeze(-1).repeat(len(x)).unsqueeze(-1), x], dim=-1)
-plt.scatter(paths[:, 400], payoffs)
-plt.plot(x, net_approx.mlp(inputs).detach())
-plt.show()
+# steps = 600
+# trials = 100
+#
+# gbm = Gbm(mu=0.02, sigma=0.2, init_value=torch.tensor([1.0]), dim=1)
+# solver = SdeSolver(sde=gbm, time=3, num_steps=steps)
+#
+# mc_stats = mc_simple(num_trials=trials, sde_solver=solver, payoff=BinaryAoN(strike=1.), discount=np.exp(-0.06))
+# mc_stats.print()
+# paths = mc_stats.paths
+# payoffs = mc_stats.payoffs
+#
+# ts = torch.tensor([t * 3 / steps for t in range(1, steps + 1)])
+#
+# net_approx = GbmNet(time_points=ts, layer_sizes=[10], mu=0.02, sigma=0.2, final_activation=nn.ReLU(), epochs=3)
+# net_approx.fit(paths, payoffs)
+#
+# lin_approx = GbmLinear(basis=[basis_1, basis_2, basis_3],  time_points=ts,
+#                        mu=0.02, sigma=0.2)
+# lin_approx.fit(paths, payoffs)
+# x = torch.linspace(0.5, 2, 100).unsqueeze(-1)
+# t = torch.tensor(2.)
+# inputs = torch.cat([t.unsqueeze(-1).repeat(len(x)).unsqueeze(-1), x], dim=-1)
+# plt.scatter(paths[:, 400], payoffs)
+# plt.plot(x, net_approx.mlp(inputs).detach())
+# plt.show()
 
 # grads_net = net_approx(0, t, x)
 # grads_lin = lin_approx(400, t, x)
 # plt.plot(x, grads_net)
 # plt.plot(x, grads_lin, color='green')
 # plt.show()
+
+
 
 # Example which shows control variates 3-4x faster with Net approximation
 # steps = 3000
