@@ -1,7 +1,8 @@
 from .regression import fit_basis
+from .nets import Mlp, PathData
 import torch
 import torch.nn as nn
-from torch.utils.data import DataLoader, Dataset
+from torch.utils.data import DataLoader
 import torch.optim as optim
 from abc import ABC, abstractmethod
 from functools import partial
@@ -86,44 +87,14 @@ class GbmLinear(LinearApproximator):
         return torch.exp(-self.mu * t) * -self.sigma * x * self.derivative(time_idx, x)
 
 
-class Mlp(nn.Module):
-    def __init__(self, input_size, layer_sizes, output_size):
-        assert len(layer_sizes) > 0, "At least one hidden layer required."
-        super(Mlp, self).__init__()
-        self.num_layers = len(layer_sizes)
-
-        layers = [nn.BatchNorm1d(input_size), nn.Linear(input_size, layer_sizes[0]), nn.BatchNorm1d(layer_sizes[0]),
-                  nn.Tanh()]
-        for i in range(self.num_layers-1):
-            layers += [nn.Linear(layer_sizes[i], layer_sizes[i+1]), nn.BatchNorm1d(layer_sizes[i+1]), nn.Tanh()]
-        layers += [nn.Linear(layer_sizes[self.num_layers-1], output_size)]
-
-        self.net = nn.Sequential(*layers)
-
-    def forward(self, x):
-        return self.net(x)
-
-
-class PathData(Dataset):
-    def __init__(self, data):
-        super(PathData, self).__init__()
-        self.data = data
-
-    def __len__(self):
-        return len(self.data)
-
-    def __getitem__(self, idx):
-        return self.data[idx, :2], self.data[idx, 2:]
-
-
 class NetApproximator(SdeApproximator):
     """Abstract class for approximate solutions using a feed-forward network"""
 
-    def __init__(self, time_points, layer_sizes, device, epochs):
+    def __init__(self, time_points, layer_sizes, final_activation, device, epochs):
         super(NetApproximator, self).__init__(time_points)
         self.device = device
         self.time_points = time_points
-        self.mlp = Mlp(2, layer_sizes, 1).to(self.device)
+        self.mlp = Mlp(2, layer_sizes, 1, final_activation=final_activation).to(self.device)
         self.epochs = epochs
 
     def fit(self, paths, payoffs):
@@ -166,14 +137,14 @@ class NetApproximator(SdeApproximator):
             out))[0][:, 1:]
         return x_grads
 
-    # @abstractmethod
+    @abstractmethod
     def __call__(self, time_idx, t, x):
         pass
 
 
 class GbmNet(NetApproximator):
-    def __init__(self, time_points, layer_sizes, mu, sigma, device='cpu', epochs=3):
-        super(GbmNet, self).__init__(time_points, layer_sizes, device, epochs)
+    def __init__(self, time_points, layer_sizes, mu, sigma, final_activation=None, device='cpu', epochs=3):
+        super(GbmNet, self).__init__(time_points, layer_sizes, final_activation, device, epochs)
         self.mu = mu
         self.sigma = sigma
 

@@ -20,7 +20,7 @@ payoffs = mc_stats.payoffs
 
 ts = torch.tensor([t * 3 / steps for t in range(1, steps + 1)])
 
-net_approx = GbmNet(time_points=ts, layer_sizes=[10, 10], mu=0.02, sigma=0.2, epochs=5)
+net_approx = GbmNet(time_points=ts, layer_sizes=[10], mu=0.02, sigma=0.2, final_activation=PosELU(), epochs=3)
 net_approx.fit(paths, payoffs)
 
 lin_approx = GbmLinear(basis=[basis_1, basis_2, basis_3],  time_points=ts,

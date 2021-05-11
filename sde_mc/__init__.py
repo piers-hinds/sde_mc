@@ -5,3 +5,4 @@ from .vreduction import *
 from .options import *
 from .regression import *
 from .approximators import *
+from .nets import *
