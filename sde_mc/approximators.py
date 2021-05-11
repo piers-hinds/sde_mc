@@ -119,10 +119,11 @@ class PathData(Dataset):
 class NetApproximator(SdeApproximator):
     """Abstract class for approximate solutions using a feed-forward network"""
 
-    def __init__(self, time_points, layer_sizes, epochs=3):
+    def __init__(self, time_points, layer_sizes, device='cpu', epochs=3):
         super(NetApproximator, self).__init__(time_points)
+        self.device = device
         self.time_points = time_points
-        self.mlp = Mlp(2, layer_sizes, 1)
+        self.mlp = Mlp(2, layer_sizes, 1).to(self.device)
         self.epochs = epochs
 
     def fit(self, paths, payoffs):
