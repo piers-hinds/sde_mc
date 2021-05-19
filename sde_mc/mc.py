@@ -99,7 +99,7 @@ def mc_simple(num_trials, sde_solver, payoff, discount=1, bs=None):
         return MCStatistics(mn, sd, tt)
 
 
-def mc_control_variate(num_trials, simple_solver, approximator, payoff, discount, step_factor=5, time_points=None,
+def mc_control_variate(num_trials, simple_solver, approximator, payoff, discounter, step_factor=5, time_points=None,
     bs=None):
     """Run Monte Carlo simulation of an SDE with a control variate
 
@@ -116,8 +116,8 @@ def mc_control_variate(num_trials, simple_solver, approximator, payoff, discount
     :param payoff: Option
         The payoff function applied to the terminal value - see the Option class
 
-    :param discount: float
-        The discount to be applied to the payoff
+    :param discounter: function(float: time)
+        The discount process to be applied to the payoff
 
     :param step_factor: int
         The factor to increase the number of steps used in the initial solver
@@ -131,11 +131,12 @@ def mc_control_variate(num_trials, simple_solver, approximator, payoff, discount
     if time_points is None:
         time_points = approximator.time_points
     simple_trials, cv_trials = num_trials
+    discount = discounter(torch.tensor(simple_solver.time))
     start = time.time()
     simple_stats = mc_simple(simple_trials, simple_solver, payoff, discount)
     approximator.fit(simple_stats.paths, simple_stats.payoffs)
     cv_sde = SdeControlVariate(base_sde=simple_solver.sde, control_variate=approximator,
-                               time_points=time_points)
+                               time_points=time_points, discounter=discounter)
     cv_solver = SdeSolver(sde=cv_sde, time=3, num_steps=len(time_points)*step_factor,
                           device=simple_solver.device)
 

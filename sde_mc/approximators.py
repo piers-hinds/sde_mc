@@ -78,24 +78,23 @@ class LinearApproximator(SdeApproximator):
 class GbmLinear(LinearApproximator):
     """Approximator for GBM"""
 
-    def __init__(self, basis, time_points, mu, sigma):
+    def __init__(self, basis, time_points):
         super(GbmLinear, self).__init__(basis, time_points)
-        self.mu = mu
-        self.sigma = sigma
 
     def __call__(self, time_idx, t, x):
-        return torch.exp(-self.mu * t) * -self.sigma * x * self.derivative(time_idx, x)
+        return self.derivative(time_idx, x)
 
 
 class NetApproximator(SdeApproximator):
     """Abstract class for approximate solutions using a feed-forward network"""
 
-    def __init__(self, time_points, layer_sizes, final_activation, device, epochs):
+    def __init__(self, time_points, layer_sizes, final_activation, dim, device, epochs):
         super(NetApproximator, self).__init__(time_points)
         self.device = device
         self.time_points = time_points
-        self.mlp = Mlp(2, layer_sizes, 1, final_activation=final_activation).to(self.device)
+        self.mlp = Mlp(dim+1, layer_sizes, 1, final_activation=final_activation).to(self.device)
         self.epochs = epochs
+        self.dim = dim
 
     def fit(self, paths, payoffs):
         # First construct data and dataloader
@@ -105,7 +104,7 @@ class NetApproximator(SdeApproximator):
                 [self.time_points[idx - 1].repeat(paths[:, idx].shape[0]).unsqueeze(1), paths[:, idx],
                  payoffs.unsqueeze(1)], dim=-1))
         data_tensor = torch.cat(data_list, dim=0)
-        path_data_set = PathData(data_tensor)
+        path_data_set = PathData(data_tensor, dim=self.dim)
         dataloader = DataLoader(path_data_set, batch_size=256, drop_last=True, shuffle=True)
 
         # Construct optimizer and loss function
@@ -143,11 +142,9 @@ class NetApproximator(SdeApproximator):
 
 
 class GbmNet(NetApproximator):
-    def __init__(self, time_points, layer_sizes, mu, sigma, final_activation=None, device='cpu', epochs=3):
-        super(GbmNet, self).__init__(time_points, layer_sizes, final_activation, device, epochs)
-        self.mu = mu
-        self.sigma = sigma
+    def __init__(self, time_points, layer_sizes, final_activation=None, dim=1, device='cpu', epochs=3):
+        super(GbmNet, self).__init__(time_points, layer_sizes, final_activation, dim, device, epochs)
 
     def __call__(self, time_idx, t, x):
         grads = self.derivative(time_idx, t, x)
-        return torch.exp(-self.mu * t) * -self.sigma * x * grads
+        return grads

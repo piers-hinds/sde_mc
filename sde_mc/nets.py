@@ -33,15 +33,16 @@ class MultiActMlp(Mlp):
 
 
 class PathData(Dataset):
-    def __init__(self, data):
+    def __init__(self, data, dim=1):
         super(PathData, self).__init__()
         self.data = data
+        self.dim = dim
 
     def __len__(self):
         return len(self.data)
 
     def __getitem__(self, idx):
-        return self.data[idx, :2], self.data[idx, 2:]
+        return self.data[idx, :(1+self.dim)], self.data[idx, (1+self.dim  ):]
 
 
 class PosELU(nn.Module):
