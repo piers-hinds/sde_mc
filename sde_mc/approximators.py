@@ -64,40 +64,30 @@ class LinearApproximator(SdeApproximator):
         x.requires_grad = False
         return basis_sum
 
-    @abstractmethod
     def __call__(self, time_idx, t, x):
-        """Override with your code here - depends on the PDE
+        """
         :param time_idx: int, the index of the time points
         :param t: torch.tensor
         :param x: torch.tensor
-        :return: the approximation for F * Y (i.e. the diffusion term of the control variate process Z)
+        :return: the approximation for the partial derivatives of u(t, x) wrt x1, x2, ...
         """
-        pass
-
-
-class GbmLinear(LinearApproximator):
-    """Approximator for GBM"""
-
-    def __init__(self, basis, time_points):
-        super(GbmLinear, self).__init__(basis, time_points)
-
-    def __call__(self, time_idx, t, x):
         return self.derivative(time_idx, x)
 
 
 class NetApproximator(SdeApproximator):
-    """Abstract class for approximate solutions using a feed-forward network"""
+    """Class for approximate solutions using a feed-forward neural network"""
 
-    def __init__(self, time_points, layer_sizes, final_activation, dim, device, epochs):
+    def __init__(self, time_points, layer_sizes, final_activation=None, dim=1, device='cpu', epochs=3, bs=256):
         super(NetApproximator, self).__init__(time_points)
         self.device = device
         self.time_points = time_points
         self.mlp = Mlp(dim+1, layer_sizes, 1, final_activation=final_activation).to(self.device)
         self.epochs = epochs
         self.dim = dim
+        self.bs = bs
 
     def fit(self, paths, payoffs):
-        # First construct data and dataloader
+        # Data and dataloader
         data_list = []
         for idx in range(1, len(self.time_points)):
             data_list.append(torch.cat(
@@ -105,19 +95,18 @@ class NetApproximator(SdeApproximator):
                  payoffs.unsqueeze(1)], dim=-1))
         data_tensor = torch.cat(data_list, dim=0)
         path_data_set = PathData(data_tensor, dim=self.dim)
-        dataloader = DataLoader(path_data_set, batch_size=256, drop_last=True, shuffle=True)
+        dataloader = DataLoader(path_data_set, batch_size=self.bs, drop_last=True, shuffle=True)
 
-        # Construct optimizer and loss function
-        sgd = optim.Adam(self.mlp.parameters())
+        # Optimizer and loss function
+        adam = optim.Adam(self.mlp.parameters())
         l2_loss = nn.MSELoss()
 
         # Train model
-        self.train_net(dataloader, sgd, l2_loss, self.epochs)
+        self.train_net(dataloader, adam, l2_loss, self.epochs)
 
     def train_net(self, dl, opt, loss_fn, epochs):
+        self.mlp.train()
         for epoch in range(epochs):
-            self.mlp.train()
-            running_loss = 0.0
             for xb, yb in dl:
                 opt.zero_grad()
                 xb = xb.float()
@@ -136,15 +125,6 @@ class NetApproximator(SdeApproximator):
             out))[0][:, 1:]
         return x_grads
 
-    @abstractmethod
     def __call__(self, time_idx, t, x):
-        pass
+        return self.derivative(time_idx, t, x)
 
-
-class GbmNet(NetApproximator):
-    def __init__(self, time_points, layer_sizes, final_activation=None, dim=1, device='cpu', epochs=3):
-        super(GbmNet, self).__init__(time_points, layer_sizes, final_activation, dim, device, epochs)
-
-    def __call__(self, time_idx, t, x):
-        grads = self.derivative(time_idx, t, x)
-        return grads
