@@ -56,3 +56,9 @@ def aon_true(spot, strike, r, vol, time):
     return value_integral / np.sqrt(2 * np.pi)
 
 
+class ConstantShortRate:
+    def __init__(self, r):
+        self.r = r
+
+    def __call__(self, t):
+        return torch.exp(-t * self.r)
