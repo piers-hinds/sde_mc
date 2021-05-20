@@ -67,23 +67,26 @@ my_discount = partial(constant_rate, rate=0.02)
 #                                   payoff=BinaryAoN(strike=1.), discounter=my_discount, step_factor=30)
 # new_cv_stats.print()
 
-steps = 600
-ts = torch.tensor([3*i / steps for i in range(1, steps+1)])
-gbm = Gbm(mu=0.02, sigma=0.2, init_value=torch.tensor([1.0]), dim=1)
-solver = SdeSolver(sde=gbm, time=3, num_steps=steps)
-net_approx = GbmNet(layer_sizes=[20, 10], time_points=ts)
-
-mc_stats = mc_simple(500, sde_solver=solver, payoff=BinaryAoN(strike=1.), discount=np.exp(-0.06))
-paths = mc_stats.paths
-payoffs = mc_stats.payoffs
-net_approx.fit(paths, payoffs)
-
-xs = torch.linspace(0.5, 2, 100)
-t = torch.tensor(2.).repeat(len(xs))
-input = torch.stack([t, xs], dim=1)
-out = net_approx.mlp(input)
-plt.plot(xs, out.detach())
-plt.show()
+# new examples
+# steps = 600
+# ts = torch.tensor([3*i / steps for i in range(1, steps+1)])
+# gbm = Gbm(mu=0.02, sigma=0.2, init_value=torch.tensor([1.0]), dim=1)
+# solver = SdeSolver(sde=gbm, time=3, num_steps=steps)
+# net_approx = GbmNet(layer_sizes=[20, 10], time_points=ts)
+#
+# mc_stats = mc_simple(500, sde_solver=solver, payoff=BinaryAoN(strike=1.), discount=np.exp(-0.06))
+# paths = mc_stats.paths
+# payoffs = mc_stats.payoffs
+# net_approx.fit(paths, payoffs)
+#
+# xs = torch.linspace(0.5, 2, 100)
+# t = torch.tensor(2.99).repeat(len(xs))
+# input = torch.stack([t, xs], dim=1)
+# out = net_approx.mlp(input)
+#
+# plt.scatter(paths[:, 598], payoffs)
+# plt.plot(xs, out.detach())
+# plt.show()
 
 
 
@@ -129,18 +132,74 @@ plt.show()
 # new_cv_stats.print()
 
 
+# steps = 100
+# ts = torch.tensor([3*i / steps for i in range(1, steps+1)])
+# x0 = torch.tensor([np.log(1), np.log(0.2**2)])
+# heston = Heston(r=0.02, kappa=0.2, theta=0.2**2, xi=0.1, rho=-0.2, init_value=x0)
+# solver = SdeSolver(sde=heston, time=3, num_steps=steps)
+# heston_cv = SdeControlVariate(base_sde=heston, control_variate=None, time_points=ts, discounter=my_discount)
+#
+# mc_stats = mc_simple(num_trials=100, sde_solver=solver, payoff=EuroCall(strike=1., log=True), discount=np.exp(-0.06))
+# paths, payoffs = mc_stats.paths, mc_stats.payoffs
+#
+# heston_approx = GbmNet(time_points=ts, layer_sizes=[10, 10], dim=2)
+# heston_approx.fit(paths, payoffs)
+# xs = torch.linspace(0.5, 2, 100)
+# vs = torch.log(torch.tensor(0.2**2)).repeat(len(xs))
+# t = torch.tensor(2.9).repeat(len(xs))
+#
+# input = torch.stack([t, torch.log(xs), vs], dim=1)
+# out = heston_approx.mlp(input)
+# d_out = heston_approx(0, torch.tensor(2.9), torch.stack([xs, vs], dim=1))
+# print(d_out)
+# plt.plot(xs, out.detach())
+# plt.show()
+
+
+
+# Heston Example with CV:
+# steps = 3000
+# ts = torch.tensor([3*i / steps for i in range(1, steps+1)])
+# x0 = torch.tensor([np.log(1), np.log(0.2**2)])
+# heston = Heston(r=0.02, kappa=0.2, theta=0.2**2, xi=0.1, rho=-0.2, init_value=x0)
+# solver = SdeSolver(sde=heston, time=3, num_steps=steps)
+# mc_stats = mc_simple(num_trials=1000, sde_solver=solver, payoff=EuroCall(strike=1., log=True), discount=np.exp(-0.06))
+# mc_stats.print()
+#
+#
 # steps = 600
 # ts = torch.tensor([3*i / steps for i in range(1, steps+1)])
 # x0 = torch.tensor([np.log(1), np.log(0.2**2)])
 # heston = Heston(r=0.02, kappa=0.2, theta=0.2**2, xi=0.1, rho=-0.2, init_value=x0)
-# heston_cv = SdeControlVariate(base_sde=heston, control_variate=None, time_points=ts, discounter=my_discount)
+# solver = SdeSolver(sde=heston, time=3, num_steps=steps)
+# heston_approx = GbmNet(time_points=ts, layer_sizes=[10, 10], dim=2)
+# mc_stats = mc_simple(num_trials=3, sde_solver=solver, payoff=EuroCall(strike=1., log=True), discount=np.exp(-0.06))
+# paths, payoffs = mc_stats.paths, mc_stats.payoffs
+# heston_approx.fit(paths, payoffs)
+# heston_cv = SdeControlVariate(base_sde=heston, control_variate=heston_approx, time_points=ts, discounter=my_discount)
+
+# derivs = heston_approx(0, torch.tensor(1.), paths[:, 0])
+# print(derivs.unsqueeze(-1))
+# sigma_t = torch.transpose(heston.diffusion(0, paths[:, 0]), 1, 2)
+# print(torch.matmul(-sigma_t, derivs.unsqueeze(-1)).transpose(1, 2))
 #
-# new_x0 = torch.cat([x0, torch.tensor([0.])])
-# x = torch.stack([new_x0, new_x0])
-# #print(x)
-# #print(heston.drift(0, x[:, :2]))
-# #print(torch.zeros_like(x[:, 2]).unsqueeze(1))
-# #torch.cat([heston.drift(0, x[:, :2]), torch.zeros_like(x[:, 2]).unsqueeze(1)], dim=-1)
-# #print(heston_cv.drift(0, x))
-# print(heston.diffusion(0, x[:, :2]))
-# print(heston_cv.diffusion(0, x))
+# heston_cv.reset_control(paths[:, 0])
+# print(heston_cv.F)
+#print(heston_cv.diffusion(torch.tensor(1.), paths[:, 0]))
+
+# mc_stats_cv = mc_control_variate((100, 1000), simple_solver=solver, approximator=heston_approx,
+#                                  payoff=EuroCall(strike=1., log=True), discounter=my_discount)
+# mc_stats_cv.print()
+
+
+
+
+
+
+
+
+
+
+
+
+

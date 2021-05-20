@@ -109,9 +109,9 @@ class SdeSolver:
 
         self.h = torch.tensor(self.time / self.num_steps, device=self.device)
         if len(self.sde.corr_matrix) > 1:
-            self.L = torch.linalg.cholesky(self.sde.corr_matrix.to(device))
+            self.lower_cholesky = torch.linalg.cholesky(self.sde.corr_matrix.to(device))
         else:
-            self.L = torch.tensor([[1.]], device=device)
+            self.lower_cholesky = torch.tensor([[1.]], device=device)
         torch.manual_seed(seed)
 
     def euler(self, bs=1):
@@ -125,11 +125,12 @@ class SdeSolver:
         paths = torch.empty(size=(bs, self.num_steps + 1, self.sde.dim), device=self.device)
         paths[:, 0] = self.sde.init_value.unsqueeze(0).repeat(bs, 1).to(self.device)
 
-        rvs = torch.randn(size=(bs, self.num_steps, self.sde.noise_dim, 1), device=self.device) * torch.sqrt(self.h)
-        rvs = torch.matmul(self.L, rvs)
+        normals = torch.randn(size=(bs, self.num_steps, self.sde.noise_dim, 1), device=self.device) * torch.sqrt(self.h)
+        corr_normals = torch.matmul(self.lower_cholesky, normals)
+
         t = torch.tensor(0.0, device=self.device)
         for i in range(self.num_steps):
             paths[:, i + 1] = paths[:, i] + self.sde.drift(t, paths[:, i]) * self.h + \
-                              torch.matmul(self.sde.diffusion(t, paths[:, i]), rvs[:, i]).squeeze(-1)
+                              torch.matmul(self.sde.diffusion(t, paths[:, i]), corr_normals[:, i]).squeeze(-1)
             t += self.h
         return paths

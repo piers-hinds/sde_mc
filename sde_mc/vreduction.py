@@ -38,8 +38,11 @@ class SdeControlVariate(Sde):
 
     def update_control(self, t, x):
         """Updates the control variate"""
-        self.F = (self.cv(self.idx, t, x[:, :self.base_dim]) *
-                  self.discounter(t)).unsqueeze(-1) * -self.base_sde.diffusion(t, x[:, :self.base_dim])
+        # self.F = (self.cv(self.idx, t, x[:, :self.base_dim]) * self.discounter(t)).unsqueeze(-1) *
+        # -self.base_sde.diffusion(t, x[:, :self.base_dim])
+        self.F = torch.matmul(-torch.transpose(self.base_sde.diffusion(t, x[:, :self.base_dim]), 1, 2),
+                              self.cv(self.idx, t, x[:, :self.base_dim]).unsqueeze(-1)).transpose(1, 2) * \
+                 self.discounter(t)
 
     def reset_control(self, x):
         """Resets the control variate (e.g. when restarting)"""
