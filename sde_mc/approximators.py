@@ -6,16 +6,18 @@ from torch.utils.data import DataLoader
 import torch.optim as optim
 from abc import ABC, abstractmethod
 from functools import partial
+import numpy as np
 
 
 class SdeApproximator(ABC):
     """Abstract base class for an approximator to the solution of the PDE associated with the SDE"""
 
-    def __init__(self, time_points):
+    def __init__(self, time_points, discounter):
         """
         :param time_points: torch.tensor, the time points at which the data is observed
         """
         self.time_points = time_points
+        self.discounter = discounter
 
     @abstractmethod
     def fit(self, paths, payoffs):
@@ -29,11 +31,11 @@ class SdeApproximator(ABC):
 class LinearApproximator(SdeApproximator):
     """Abstract class for the approximate solutions to the SDEs using linear regression"""
 
-    def __init__(self, basis, time_points):
+    def __init__(self, basis, time_points, discounter):
         """
         :param basis: list of functions, the basis functions to fit to the data
         """
-        super(LinearApproximator, self).__init__(time_points=time_points)
+        super(LinearApproximator, self).__init__(time_points=time_points, discounter=discounter)
         self.basis = basis
         self.coefs = None
 
@@ -46,7 +48,8 @@ class LinearApproximator(SdeApproximator):
         self.coefs = torch.empty((paths.shape[1] - 1, len(self.basis)))
         for i in range(1, paths.shape[1]):
             current_basis = [partial(b, t=self.time_points[i-1]) for b in self.basis]
-            self.coefs[i-1] = fit_basis(paths[:, i].squeeze(-1), payoffs, current_basis)
+            self.coefs[i-1] = fit_basis(paths[:, i].squeeze(-1), payoffs/self.discounter(self.time_points[i-1]),
+                                        current_basis)
 
     def derivative(self, time_idx, x):
         """Computes the derivative at (time_idx, x) using automatic differentiation
@@ -77,11 +80,11 @@ class LinearApproximator(SdeApproximator):
 class NetApproximator(SdeApproximator):
     """Class for approximate solutions using a feed-forward neural network"""
 
-    def __init__(self, time_points, layer_sizes, final_activation=None, dim=1, device='cpu', epochs=3, bs=256):
-        super(NetApproximator, self).__init__(time_points)
+    def __init__(self, time_points, layer_sizes, discounter, dim=1, device='cpu', epochs=3, bs=256):
+        super(NetApproximator, self).__init__(time_points, discounter)
         self.device = device
         self.time_points = time_points
-        self.mlp = Mlp(dim+1, layer_sizes, 1, final_activation=final_activation).to(self.device)
+        self.mlp = Mlp(dim+1, layer_sizes, 1).to(self.device)
         self.epochs = epochs
         self.dim = dim
         self.bs = bs
@@ -92,7 +95,7 @@ class NetApproximator(SdeApproximator):
         for idx in range(1, len(self.time_points)):
             data_list.append(torch.cat(
                 [self.time_points[idx - 1].repeat(paths[:, idx].shape[0]).unsqueeze(1), paths[:, idx],
-                 payoffs.unsqueeze(1)], dim=-1))
+                 payoffs.unsqueeze(1) / self.discounter(self.time_points[idx - 1])], dim=-1))
         data_tensor = torch.cat(data_list, dim=0)
         path_data_set = PathData(data_tensor, dim=self.dim)
         dataloader = DataLoader(path_data_set, batch_size=self.bs, drop_last=True, shuffle=True)
