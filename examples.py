@@ -7,17 +7,34 @@ from functools import partial
 from abc import ABC, abstractmethod
 
 
-# Getting Y right
-steps = 5
-trials = 2
+# What takes time in NN eval? 1) Evaluating the gradients or 2) Just updating F
+# If 1, think about alternatives to current implementation of NN, possible the autograd function, no problem in
+# manual grad calculation like in linear case
+# If 2, make F update faster (Should be possible since linear method has no problem)
 
-ts = torch.tensor([i*3/steps for i in range(1, steps+1)])
+print('Original method:')
+steps = 100
+ts = torch.tensor([3*i / steps for i in range(1, steps+1)])
 gbm = Gbm(mu=0.02, sigma=0.2, init_value=torch.tensor([1.0]), dim=1)
 solver = SdeSolver(sde=gbm, time=3, num_steps=steps)
-mc_stats = mc_simple(trials, solver, BinaryAoN(strike=1.), discount=np.exp(-0.06))
-print(mc_stats.paths)
-print(ts)
-print(mc_stats.payoffs)
+net_approx = NetApproximator(layer_sizes=[10, 5], time_points=ts, discounter=ConstantShortRate(r=0.02))
+new_cv_stats = mc_control_variate(num_trials=(150, 5000), simple_solver=solver, approximator=net_approx,
+                                  payoff=BinaryAoN(strike=1.), discounter=ConstantShortRate(r=0.02), step_factor=30)
+new_cv_stats.print()
+
+
+
+# print('New method:')
+# steps = 100
+# ts = torch.tensor([3*i / steps for i in range(1, steps+1)])
+# gbm = Gbm(mu=0.02, sigma=0.2, init_value=torch.tensor([1.0]), dim=1)
+# solver = SdeSolver(sde=gbm, time=3, num_steps=steps)
+# net_approx = NetApproximator(layer_sizes=[10], time_points=ts, discounter=ConstantShortRate(r=0.02))
+# net_approx.mlp = MlpTest(input_size=2, layer_sizes=[10, 5], output_size=1)
+# new_cv_stats = mc_control_variate(num_trials=(150, 5000), simple_solver=solver, approximator=net_approx,
+#                                   payoff=BinaryAoN(strike=1.), discounter=ConstantShortRate(r=0.02), step_factor=30)
+# new_cv_stats.print()
+
 
 # Basket option on multi-dimensional GBM
 # steps = 3000
