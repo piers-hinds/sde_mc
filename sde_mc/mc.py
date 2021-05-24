@@ -8,7 +8,7 @@ from .sde import SdeSolver
 class MCStatistics:
     """A class to store relevant Monte Carlo statistics"""
 
-    def __init__(self, sample_mean, sample_std, time_elapsed, paths=None, payoffs=None):
+    def __init__(self, sample_mean, sample_std, time_elapsed, paths=None, payoffs=None, normals=None):
         """
         :param sample_mean: torch.tensor
             The mean of the samples
@@ -30,6 +30,7 @@ class MCStatistics:
         self.time_elapsed = time_elapsed
         self.paths = paths
         self.payoffs = payoffs
+        self.normals = normals
 
     def print(self, num_std=2):
         """Prints the mean, confidence interval, and time taken
@@ -42,7 +43,7 @@ class MCStatistics:
                                                                            self.time_elapsed))
 
 
-def mc_simple(num_trials, sde_solver, payoff, discount=1, bs=None):
+def mc_simple(num_trials, sde_solver, payoff, discount=1, bs=None, return_normals=False):
     """Run Monte Carlo simulations of an SDE
 
     :param num_trials: int
@@ -61,12 +62,16 @@ def mc_simple(num_trials, sde_solver, payoff, discount=1, bs=None):
         The batch size. When None all trials will be done simultaneously. When a bs is specified the payoffs
         and paths will not be recorded
 
+    :param return_normals: bool, default = False
+        If True, passes return_normals to the Euler method of the SDE solver. Returns the normal random variables
+        used in the numerical integration
+
     :return: MCStatistics
         The relevant statistics from the MC simulation - see the MCStatistics class
     """
     if not bs:
         start = time.time()
-        out = sde_solver.euler(bs=num_trials)
+        out, normals = sde_solver.euler(bs=num_trials, return_normals=return_normals)
         spots = out[:, sde_solver.num_steps]
         payoffs = payoff(spots) * discount
 
@@ -75,7 +80,7 @@ def mc_simple(num_trials, sde_solver, payoff, discount=1, bs=None):
         end = time.time()
         tt = end - start
 
-        return MCStatistics(mn, sd, tt, out, payoffs)
+        return MCStatistics(mn, sd, tt, out, payoffs, normals)
     else:
         remaining_trials = num_trials
         sample_sum, sample_sum_sq = 0.0, 0.0

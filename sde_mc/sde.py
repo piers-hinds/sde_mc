@@ -138,4 +138,4 @@ class SdeSolver:
         if return_normals:
             return paths, corr_normals
         else:
-            return paths
+            return paths, None

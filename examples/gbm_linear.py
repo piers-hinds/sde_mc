@@ -6,7 +6,7 @@ from sde_mc import *
 
 # MC without control variates for comparison
 steps = 3000
-trials = 70000
+trials = 700
 
 gbm = Gbm(mu=0.02, sigma=0.2, init_value=torch.tensor([1.0]), dim=1)
 solver = SdeSolver(sde=gbm, time=3, num_steps=steps)
