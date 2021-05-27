@@ -70,6 +70,18 @@ class Basket(Option):
                                                                                 device=spot.device))
 
 
+class Rainbow(Option):
+    def __init__(self, strike, log=False):
+        super(Rainbow, self).__init__(log)
+        self.strike = strike
+
+    def __call__(self, x):
+        x = torch.exp(x) if self.log else x
+        spot = x.max(1).values
+        return torch.where(spot > self.strike, spot - self.strike, torch.tensor(0., dtype=spot.dtype,
+                                                                                device=spot.device))
+
+
 class ConstantShortRate:
     def __init__(self, r):
         self.r = r

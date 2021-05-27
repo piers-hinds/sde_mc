@@ -22,6 +22,11 @@ new_cv_stats = mc_control_variate(num_trials=(150, 5000), simple_solver=solver, 
                                   payoff=BinaryAoN(strike=1.), discounter=ConstantShortRate(r=0.02), step_factor=30)
 new_cv_stats.print()
 
+x = torch.tensor([[4., 6.], [1., 2.5]])
+print(x.max(1))
+rb = Rainbow(strike=4.)
+print(rb(x))
+
 
 
 # print('New method:')
