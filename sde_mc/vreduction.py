@@ -1,5 +1,6 @@
 from .sde import Sde
 import torch
+import numpy as np
 
 
 class SdeControlVariate(Sde):
@@ -48,3 +49,46 @@ class SdeControlVariate(Sde):
         """Resets the control variate (e.g. when restarting)"""
         self.F = torch.zeros_like(x[:, :self.base_dim]).unsqueeze(1)
         self.idx = 0
+
+
+def train_control_variate(F_approx, dl, opt, time_points, dim, Ys, epochs):
+    rep_time_points = time_points.repeat(dl.batch_size).unsqueeze(-1)
+    steps = len(time_points)
+    loss_arr = []
+    for epoch in range(epochs):
+        F_approx.train()
+        run_loss = 0
+        for i, (xb, yb) in enumerate(dl):
+            opt.zero_grad()
+            inputs = torch.cat([rep_time_points, xb[0].reshape(dl.batch_size*steps, dim)], dim=-1)
+            outputs = F_approx(inputs).view(dl.batch_size, steps, dim)
+            Zs = (xb[1] * (outputs * Ys.view(1, len(Ys), 1))).sum(-1).sum(-1)
+            var_loss = (yb + Zs).var()
+            run_loss += var_loss.item()
+            var_loss.backward()
+            opt.step()
+    loss_arr.append(run_loss / len(dl))
+    print('{}: Train loss: {:.5f}     Train 95: {:.5f}'.format(epoch, loss_arr[epoch], np.sqrt(loss_arr[epoch])*2 / np.sqrt((i+1)*len(dl))))
+    F_approx.eval()
+
+
+def get_preds(F_approx, new_dl, new_time_points, dim, new_Ys):
+    rep_new_time_points = new_time_points.repeat(new_dl.batch_size).unsqueeze(-1)
+    new_steps = len(new_time_points)
+    run_sum = 0
+    run_sum_sq = 0
+    with torch.no_grad():
+        for i, (xb, yb) in enumerate(new_dl):
+            inputs = torch.cat([rep_new_time_points, xb[0].reshape(new_dl.batch_size*new_steps, dim)], dim=-1)
+            outputs = F_approx(inputs).view(new_dl.batch_size, new_steps, dim)
+            Zs = ((outputs * new_Ys.view(1, len(new_Ys), 1)) * xb[1]).sum(-1).sum(-1)
+            gammas = yb + Zs
+            run_sum += gammas.sum()
+            run_sum_sq += (gammas * gammas).sum()
+    new_trials = (i + 1) * new_dl.batch_size
+    new_mn = (run_sum / new_trials)
+    new_sample_sd = torch.sqrt(((run_sum_sq - (run_sum*run_sum) / new_trials) / (new_trials - 1)))
+    new_sd = new_sample_sd / np.sqrt(new_trials)
+    print(new_trials)
+    print(new_mn, new_sd)
+    return new_mn, new_sd

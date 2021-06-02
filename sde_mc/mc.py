@@ -1,8 +1,11 @@
 import time
 import numpy as np
 import torch
-from .vreduction import SdeControlVariate
+import torch.optim as optim
+from torch.utils.data import DataLoader
+from .vreduction import SdeControlVariate, get_preds, train_control_variate
 from .sde import SdeSolver
+from .nets import NormalPathData
 
 
 class MCStatistics:
@@ -153,3 +156,50 @@ def mc_control_variate(num_trials, simple_solver, approximator, payoff, discount
     end = time.time()
     cv_stats.time_elapsed = end-start
     return cv_stats
+
+
+def mc_min_variance(trials, solver, model, payoff, discounter, bs, step_factor=5, pre_trained=False, epochs=10):
+    # Setup
+    init_trials, final_trials = trials if not pre_trained else (0, trials)
+    init_bs, final_bs = bs
+    steps = solver.num_steps
+    solver.num_steps = int(steps / step_factor)
+    ts = torch.tensor([solver.sde.time * i / solver.num_steps for i in range(solver.num_steps)], device=solver.device)
+    discounts = discounter(ts)
+    dim = solver.sde.dim
+    end_time = torch.tensor(solver.sde.time)
+
+    start = time.time()
+    # MC with no control variate on coarse grid
+    mc_stats = mc_simple(num_trials=init_trials, sde_solver=solver, payoff=payoff,
+                         discount=discounter(end_time), return_normals=True)
+    mc_stats.print()
+    paths, payoffs, normals = mc_stats.paths, mc_stats.payoffs, mc_stats.normals.squeeze(-1)
+
+    # Set up data
+    data = NormalPathData(paths, payoffs, normals)
+    dl = DataLoader(data, batch_size=init_bs, shuffle=True, drop_last=True)
+    adam = optim.Adam(model.parameters())
+
+    # Train net
+    train_control_variate(model, dl, adam, ts, dim, Ys=discounts, epochs=epochs)
+
+    # New MC with finer time grid
+    solver.num_steps = steps
+    new_ts = torch.tensor([3*i/solver.num_steps for i in range(solver.num_steps)], device=solver.device)
+    new_discounts = discounter(new_ts)
+
+    new_mc_stats = mc_simple(num_trials=final_trials, sde_solver=solver, payoff=payoff,
+                             discount=discounter(end_time), return_normals=True)
+    new_paths, new_payoffs, new_normals = new_mc_stats.paths, new_mc_stats.payoffs, new_mc_stats.normals.squeeze(-1)
+
+    new_data = NormalPathData(new_paths, new_payoffs, new_normals)
+    new_dl = DataLoader(new_data, batch_size=final_bs, shuffle=False)
+
+    # Get predictions of control variate
+    mn, sd = get_preds(model, new_dl, new_ts, dim, new_Ys=new_discounts)
+
+    # Return mean, std
+    end = time.time()
+    tt = end-start
+    return MCStatistics(mn, sd, tt)
