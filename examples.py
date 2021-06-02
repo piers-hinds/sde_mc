@@ -15,7 +15,15 @@ from abc import ABC, abstractmethod
 # paths = solver.euler(bs=trials)
 # print(paths)
 
+steps = 100
+trials = 5000
+bs = 100
 
+gbm = Gbm(mu=0.02, sigma=0.2, init_value=torch.tensor([1.0]), dim=1)
+solver = SdeSolver(gbm, 3, steps)
+
+mc_stats = mc_simple(trials, solver, BinaryAoN(1.), np.exp(-0.06), bs=None)
+mc_stats.print()
 
 
 
