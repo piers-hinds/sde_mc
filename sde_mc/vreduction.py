@@ -67,9 +67,9 @@ def train_control_variate(F_approx, dl, opt, time_points, dim, Ys, epochs):
             run_loss += var_loss.item()
             var_loss.backward()
             opt.step()
-    loss_arr.append(run_loss / len(dl))
-    print('{}: Train loss: {:.5f}     Train 95: {:.5f}'.format(epoch, loss_arr[epoch], np.sqrt(loss_arr[epoch])*2 / np.sqrt((i+1)*len(dl))))
-    F_approx.eval()
+        loss_arr.append(run_loss / len(dl))
+        print('{}: Train loss: {:.5f}     Train 95: {:.5f}'.format(epoch, loss_arr[epoch], np.sqrt(loss_arr[epoch])*2 / np.sqrt((i+1)*len(dl))))
+        F_approx.eval()
 
 
 def get_preds(F_approx, new_dl, new_time_points, dim, new_Ys):

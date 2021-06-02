@@ -16,14 +16,19 @@ from abc import ABC, abstractmethod
 # print(paths)
 
 steps = 100
-trials = 5000
-bs = 100
+trials = 1000
+bs = None
 
-gbm = Gbm(mu=0.02, sigma=0.2, init_value=torch.tensor([1.0]), dim=1)
-solver = SdeSolver(gbm, 3, steps)
+gbm = Gbm(mu=0.02, sigma=0.2, init_value=torch.tensor([1.0] * 2), dim=2)
+solver = SdeSolver(sde=gbm, time=3, num_steps=steps)
 
-mc_stats = mc_simple(trials, solver, BinaryAoN(1.), np.exp(-0.06), bs=None)
+mc_stats = mc_simple(trials, solver, Rainbow(strike=1.), np.exp(-0.06), bs=bs)
 mc_stats.print()
+
+mlp = Mlp(gbm.dim + 1, [30, 30], gbm.dim)
+stats = mc_min_variance(trials=(1000, 1000), solver=solver, model=mlp, payoff=Rainbow(strike=1.), discounter=ConstantShortRate(r=0.02),
+                        bs=(100, 1000), step_factor=30, epochs=4)
+stats.print()
 
 
 
