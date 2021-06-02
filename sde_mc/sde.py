@@ -107,7 +107,6 @@ class SdeSolver:
         self.num_steps = num_steps
         self.device = device
 
-        self.h = torch.tensor(self.time / self.num_steps, device=self.device)
         if len(self.sde.corr_matrix) > 1:
             self.lower_cholesky = torch.linalg.cholesky(self.sde.corr_matrix.to(device))
         else:
@@ -123,19 +122,54 @@ class SdeSolver:
         assert bs >= 1, "Batch size must at least one"
         bs = int(bs)
 
+        h = torch.tensor(self.time / self.num_steps, device=self.device)
+
         paths = torch.empty(size=(bs, self.num_steps + 1, self.sde.dim), device=self.device)
         paths[:, 0] = self.sde.init_value.unsqueeze(0).repeat(bs, 1).to(self.device)
 
-        normals = torch.randn(size=(bs, self.num_steps, self.sde.noise_dim, 1), device=self.device) * torch.sqrt(self.h)
+        normals = torch.randn(size=(bs, self.num_steps, self.sde.noise_dim, 1), device=self.device) * torch.sqrt(h)
         corr_normals = torch.matmul(self.lower_cholesky, normals)
 
         t = torch.tensor(0.0, device=self.device)
         for i in range(self.num_steps):
-            paths[:, i + 1] = paths[:, i] + self.sde.drift(t, paths[:, i]) * self.h + \
+            paths[:, i + 1] = paths[:, i] + self.sde.drift(t, paths[:, i]) * h + \
                               torch.matmul(self.sde.diffusion(t, paths[:, i]), corr_normals[:, i]).squeeze(-1)
-            t += self.h
+            t += h
 
         if return_normals:
             return paths, corr_normals
         else:
             return paths, None
+
+
+class HestonSolver(SdeSolver):
+    """A solver class specifically designed for the Heston model, where the volatility should be simulated using a
+    different scheme (fully-implicit) to the asset price (explicit) to preserve positivity of the volatility."""
+
+    def euler(self, bs=1, return_normals=False):
+        assert bs >= 1, "Batch size must at least one"
+        bs = int(bs)
+
+        paths = torch.empty(size=(bs, self.num_steps + 1, self.sde.dim), device=self.device)
+        paths[:, 0] = self.sde.init_value.unsqueeze(0).repeat(bs, 1).to(self.device)
+
+        normals = torch.randn(size=(bs, self.num_steps, self.sde.noise_dim, 1), device=self.device) * torch.sqrt(self.h)
+        corr_normals = torch.matmul(self.lower_cholesky, normals).squeeze(-1)
+
+        t = torch.tensor(0.0, device=self.device)
+
+        for i in range(self.num_steps):
+            # Calculate Xk as normal
+            paths[:, i+1, 0] = paths[:, i, 0] + self.sde.r * paths[:, i, 0] * self.h +\
+                               paths[:, i, 0] * torch.sqrt(paths[:, i, 1]) * corr_normals[:, i, 0]
+            # Solve for sqrt V_k+1
+            # A, B, C =
+            # paths = quad formula ^2
+            a = (1 - self.h * self.sde.kappa)
+            c = (paths[:, i, 1] + self.h * self.sde.kappa * self.sde.theta - self.h * self.sde.xi * self.sde.xi * 0.5)
+            b = (self.sde.xi * corr_normals[:, i, 1])
+
+            paths[:, i+1, 1] = ((- b + torch.sqrt(b * b - 4 * a * c)) / (2 * a)) ** 2
+
+        return paths
+
