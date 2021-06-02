@@ -164,10 +164,10 @@ def mc_min_variance(trials, solver, model, payoff, discounter, bs, step_factor=5
     init_bs, final_bs = bs
     steps = solver.num_steps
     solver.num_steps = int(steps / step_factor)
-    ts = torch.tensor([solver.sde.time * i / solver.num_steps for i in range(solver.num_steps)], device=solver.device)
+    ts = torch.tensor([solver.time * i / solver.num_steps for i in range(solver.num_steps)], device=solver.device)
     discounts = discounter(ts)
     dim = solver.sde.dim
-    end_time = torch.tensor(solver.sde.time)
+    end_time = torch.tensor(solver.time)
 
     start = time.time()
     # MC with no control variate on coarse grid
