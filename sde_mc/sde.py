@@ -1,5 +1,6 @@
 from abc import ABC, abstractmethod
 import torch
+from block_diag import block_diag
 
 
 class Sde(ABC):
@@ -173,3 +174,48 @@ class HestonSolver(SdeSolver):
 
         return paths
 
+
+class StackSde(Sde):
+    """A class to stack multiple SDEs into one multidimensional SDEs"""
+    def __init__(self, sdes):
+        dim = 0
+        for sde in sdes:
+            dim += sde.dim
+        super(StackSde, self).__init__()
+
+    def drift(self, t, x):
+        pass
+
+    def diffusion(self, t, x):
+        pass
+
+
+class MultiHeston(Sde):
+    """Multiple Heston models"""
+
+    def __init__(self, r, kappa, theta, xi, rho, init_value, dim):
+        """
+        :param r: float, the risk-free rate
+        :param kappa: float, mean-reversion rate of the variance process
+        :param theta: float, the long-run mean of the variance process
+        :param xi: float, the vol-of-vol
+        :param rho: float, the correlation between the two Wiener processes
+        :param init_value: torch.tensor (2), the initial spot price and the initial variance
+        """
+        assert torch.all(torch.gt(2 * kappa * theta, xi ** 2)), "Feller condition not satisfied"
+        super(MultiHeston, self).__init__(init_value=init_value, dim=2*dim, noise_dim=2*dim,
+                                     corr_matrix=torch.tensor([[1., rho[0], 0, 0], [rho[0], 1., 0, 0],
+                                                               [0, 0, 1, rho[1]], [0, 0, rho[1], 1]]))
+        self.r = r
+        self.kappa = kappa
+        self.theta = theta
+        self.xi = xi
+
+        self.h1 = Heston(r[0], kappa[0], theta[0], xi[0], rho[0], init_value[:2])
+        self.h2 = Heston(r[1], kappa[1], theta[1], xi[1], rho[1], init_value[2:4])
+
+    def drift(self, t, x):
+        return torch.cat([self.h1.drift(t, x), self.h2.drift(t, x)], dim=-1)
+
+    def diffusion(self, t, x):
+        return block_diag([self.h1.diffusion(t, x), self.h2.diffusion(t, x)])

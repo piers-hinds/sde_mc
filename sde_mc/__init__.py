@@ -6,3 +6,4 @@ from .options import *
 from .regression import *
 from .approximators import *
 from .nets import *
+from .block_diag import *

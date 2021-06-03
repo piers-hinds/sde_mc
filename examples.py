@@ -15,20 +15,19 @@ from abc import ABC, abstractmethod
 # paths = solver.euler(bs=trials)
 # print(paths)
 
-steps = 100
-trials = 1000
-bs = None
+r = torch.tensor([0.02, 0.02])
+kappa = torch.tensor([0.4, 0.4])
+theta = torch.tensor([0.2**2, 0.2**2])
+xi = torch.tensor([0.1, 0.1])
+rho = torch.tensor([-0.3, -0.3])
+x0 = torch.tensor([0., np.log(0.2**2), 0., np.log(0.2**2)])
 
-gbm = Gbm(mu=0.02, sigma=0.2, init_value=torch.tensor([1.0] * 2), dim=2)
-solver = SdeSolver(sde=gbm, time=3, num_steps=steps)
+heston = Heston(0.02, 0.4, 0.2**2, 0.1, -0.3, torch.tensor([0., np.log(0.2**2)]))
+multi_heston = MultiHeston(r=r, kappa=kappa, theta=theta, xi=xi, rho=rho, init_value=x0, dim=2)
 
-mc_stats = mc_simple(trials, solver, Rainbow(strike=1.), np.exp(-0.06), bs=bs)
+solver = SdeSolver(multi_heston, 3, 100)
+mc_stats = mc_simple(1000, solver, HestonRainbow(strike=1, log=True), discount=np.exp(-0.06))
 mc_stats.print()
-
-mlp = Mlp(gbm.dim + 1, [30, 30], gbm.dim)
-stats = mc_min_variance(trials=(1000, 1000), solver=solver, model=mlp, payoff=Rainbow(strike=1.), discounter=ConstantShortRate(r=0.02),
-                        bs=(100, 1000), step_factor=30, epochs=4)
-stats.print()
 
 
 

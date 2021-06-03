@@ -82,6 +82,20 @@ class Rainbow(Option):
                                                                                 device=spot.device))
 
 
+class HestonRainbow(Option):
+    def __init__(self, strike, log=False):
+        super(HestonRainbow, self).__init__(log)
+        self.strike = strike
+
+    def __call__(self, x):
+        x = torch.exp(x) if self.log else x
+        even_inds = torch.tensor([i for i in range(len(x[0])) if not i%2])
+        x = torch.index_select(x, 1, even_inds)
+        spot = x.max(1).values
+        return torch.where(spot > self.strike, spot - self.strike, torch.tensor(0., dtype=spot.dtype,
+                                                                                device=spot.device))
+
+
 class ConstantShortRate:
     def __init__(self, r):
         self.r = r
