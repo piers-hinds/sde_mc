@@ -1,6 +1,6 @@
 from abc import ABC, abstractmethod
 import torch
-from block_diag import block_diag
+from .block_diag import block_diag
 
 
 class Sde(ABC):

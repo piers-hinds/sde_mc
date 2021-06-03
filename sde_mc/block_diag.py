@@ -1,7 +1,6 @@
 """A part of the pylabyk library: numpytorch.py at https://github.com/yulkang/pylabyk"""
 import torch
 
-
 def block_diag(m):
     """
     Make a block diagonal matrix along dim=-3
