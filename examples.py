@@ -6,30 +6,29 @@ import matplotlib.pyplot as plt
 from functools import partial
 from abc import ABC, abstractmethod
 
-# steps = 4
-# trials = 3
-#
-# x0 = torch.tensor([1., 0.25])
-# heston = Heston(r=0.02, kappa=0.2, theta=0.3, xi=0.1, rho=-0.2, init_value=x0)
-# solver = HestonSolver(heston, 3, steps)
-# paths = solver.euler(bs=trials)
-# print(paths)
 
-r = torch.tensor([0.02, 0.02])
-kappa = torch.tensor([0.4, 0.4])
-theta = torch.tensor([0.2**2, 0.2**2])
-xi = torch.tensor([0.1, 0.1])
-rho = torch.tensor([-0.3, -0.3])
-x0 = torch.tensor([0., np.log(0.2**2), 0., np.log(0.2**2)])
+S = 1.
+K = 1
+T = 3
+r = 0.02
+sigma = 0.2
+m = 0
+v = 0.3
+lam = 2
+trials = 100000
 
-heston = Heston(0.02, 0.4, 0.2**2, 0.1, -0.3, torch.tensor([0., np.log(0.2**2)]))
-multi_heston = MultiHeston(r=r, kappa=kappa, theta=theta, xi=xi, rho=rho, init_value=x0, dim=2)
+call = EuroCall(strike=K)
 
-solver = SdeSolver(multi_heston, 3, 100)
-mc_stats = mc_simple(1000, solver, HestonRainbow(strike=1, log=True), discount=np.exp(-0.06))
-mc_stats.print()
+true_price = merton_jump_call(S, K, T, r, sigma, np.exp(m+v**2*0.5), v, lam)
+print(true_price)
 
 
+gbm = Gbm(mu=r-lam*(np.exp(v**2*0.5) - 1), sigma=sigma, init_value=torch.tensor([S]), dim=1)
+solver = JumpSolver(sde=gbm, time=T, num_steps=1000, seed=3)
+paths, jumps = solver.euler_jumps(rate=lam, v=v, bs=trials)
+
+payoffs = call(paths[:, solver.num_steps])
+print(payoffs.mean() * np.exp(-r*T), 2*payoffs.std()/np.sqrt(trials))
 
 
 

@@ -219,3 +219,34 @@ class MultiHeston(Sde):
 
     def diffusion(self, t, x):
         return block_diag([self.h1.diffusion(t, x), self.h2.diffusion(t, x)])
+
+
+class JumpSolver(SdeSolver):
+    def euler_jumps(self, rate=1, m=0, v=0.3, bs=1, return_normals=False):
+        assert bs >= 1, "Batch size must at least one"
+        bs = int(bs)
+
+        h = torch.tensor(self.time / self.num_steps, device=self.device)
+
+        paths = torch.empty(size=(bs, self.num_steps + 1, self.sde.dim), device=self.device)
+        paths[:, 0] = self.sde.init_value.unsqueeze(0).repeat(bs, 1).to(self.device)
+
+        normals = torch.randn(size=(bs, self.num_steps, self.sde.noise_dim, 1), device=self.device) * torch.sqrt(h)
+        corr_normals = torch.matmul(self.lower_cholesky, normals)
+
+        rates = torch.ones(size=(bs, self.num_steps, self.sde.dim), device=self.device) * (rate * h)
+        poissons = torch.poisson(rates)
+        max_jumps = (torch.randn(size=(bs, self.num_steps, self.sde.dim), device=self.device) * v).exp() - 1
+        jumps = (max_jumps * torch.gt(poissons, 0))
+
+        t = torch.tensor(0.0, device=self.device)
+        for i in range(self.num_steps):
+            paths[:, i + 1] = (paths[:, i] + self.sde.drift(t, paths[:, i]) * h + \
+                              torch.matmul(self.sde.diffusion(t, paths[:, i]), corr_normals[:, i]).squeeze(-1)) * \
+                              (jumps[:, i] + 1)
+            t += h
+
+        if return_normals:
+            return paths, corr_normals
+        else:
+            return paths, None
