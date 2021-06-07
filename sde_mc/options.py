@@ -1,6 +1,7 @@
 import numpy as np
 import torch
 from scipy.integrate import quad
+from scipy.stats import norm
 from abc import ABC, abstractmethod
 
 
@@ -19,6 +20,23 @@ def aon_true(spot, strike, r, vol, time):
     lower_limit = -np.inf
     value_integral = quad(lambda z: np.exp(- 0.5 * z * z), lower_limit, upper_limit)[0]
     return value_integral / np.sqrt(2 * np.pi)
+
+
+def bs_call(spot, strike, expiry, r, sigma):
+    d1 = (np.log(spot / strike) + (r + sigma ** 2 / 2) * expiry) / (sigma * np.sqrt(expiry))
+    d2 = d1 - sigma * np.sqrt(expiry)
+    return spot * norm.cdf(d1) - strike * np.exp(-r * expiry) * norm.cdf(d2)
+
+
+def merton_jump_call(spot, strike, expiry, r, sigma, mean_jump, std_jump, rate):
+    partial_sum = 0
+    for k in range(40):
+        r_k = r - rate * (mean_jump - 1) + (k * np.log(mean_jump)) / expiry
+        sigma_k = np.sqrt(sigma ** 2 + (k * std_jump ** 2) / expiry)
+        k_fact = np.math.factorial(k)
+        partial_sum += (np.exp(-mean_jump * rate * expiry) * (mean_jump * rate * expiry) ** k / (k_fact)) * \
+             bs_call(spot, strike, expiry, r_k, sigma_k)
+    return partial_sum
 
 
 class Option(ABC):
