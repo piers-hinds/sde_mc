@@ -119,4 +119,6 @@ class ConstantShortRate:
         self.r = r
 
     def __call__(self, t):
+        if not torch.is_tensor(t):
+            t = torch.tensor(t)
         return torch.exp(-t * self.r)
