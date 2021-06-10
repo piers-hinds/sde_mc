@@ -25,7 +25,7 @@ print(true_price)
 
 gbm = Gbm(mu=r-lam*(np.exp(v**2*0.5) - 1), sigma=sigma, init_value=torch.tensor([S]), dim=1)
 solver = JumpSolver(sde=gbm, time=T, num_steps=1000, seed=3)
-paths, jumps = solver.euler_jumps(rate=lam, v=v, bs=trials)
+paths, jumps = solver.euler(rate=lam, v=v, bs=trials)
 
 payoffs = call(paths[:, solver.num_steps])
 print(payoffs.mean() * np.exp(-r*T), 2*payoffs.std()/np.sqrt(trials))

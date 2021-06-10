@@ -222,7 +222,7 @@ class MultiHeston(Sde):
 
 
 class JumpSolver(SdeSolver):
-    def euler_jumps(self, rate=1, m=0, v=0.3, bs=1, return_normals=False):
+    def euler(self, rate=1, m=0, v=0.3, bs=1, return_normals=False):
         assert bs >= 1, "Batch size must at least one"
         bs = int(bs)
 
@@ -247,6 +247,6 @@ class JumpSolver(SdeSolver):
             t += h
 
         if return_normals:
-            return paths, corr_normals
+            return paths, (corr_normals, jumps)
         else:
             return paths, None
