@@ -49,3 +49,17 @@ class NormalPathData(Dataset):
     def __getitem__(self, idx):
         return (self.paths[idx], self.normals[idx]), self.payoffs[idx]
 
+
+class NormalJumpsPathData(Dataset):
+    def __init__(self, paths, payoffs, normals, jumps):
+        self.paths = paths[:, :-1]
+        self.payoffs = payoffs
+        self.normals = normals
+        self.jumps = jumps
+
+    def __len__(self):
+        return len(self.payoffs)
+
+    def __getitem__(self, idx):
+        return (self.paths[idx], self.normals[idx], self.jumps[idx]), self.payoffs[idx]
+
