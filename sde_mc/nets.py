@@ -1,7 +1,6 @@
 import torch
 import torch.nn as nn
 from torch.utils.data import Dataset
-import torch.nn.functional as F
 
 
 class Mlp(nn.Module):

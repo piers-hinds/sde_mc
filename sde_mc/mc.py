@@ -4,7 +4,7 @@ import torch
 import torch.optim as optim
 from torch.utils.data import DataLoader
 from .vreduction import SdeControlVariate, get_preds, train_control_variate
-from .sde import SdeSolver
+from .solvers import SdeSolver
 from .nets import NormalPathData
 
 
