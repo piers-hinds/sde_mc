@@ -23,7 +23,7 @@ class SdeSolver:
             self.lower_cholesky = torch.tensor([[1.]], device=device)
         torch.manual_seed(seed)
 
-    def euler(self, bs=1, return_normals=False):
+    def euler(self, bs=1, return_normals=False, input_normals=None):
         """Implements the Euler method for solving SDEs
         :param bs: int, the batch size (the number of paths simulated simultaneously)
         :param return_normals: bool, if True returns the normal random variables used
@@ -36,10 +36,13 @@ class SdeSolver:
 
         paths = torch.empty(size=(bs, self.num_steps + 1, self.sde.dim), device=self.device)
         paths[:, 0] = self.sde.init_value.unsqueeze(0).repeat(bs, 1).to(self.device)
-
-        normals = torch.randn(size=(bs, self.num_steps, self.sde.noise_dim, 1), device=self.device) * torch.sqrt(h)
-        corr_normals = torch.matmul(self.lower_cholesky, normals)
-
+        
+        if input_normals is None:
+            normals = torch.randn(size=(bs, self.num_steps, self.sde.noise_dim, 1), device=self.device) * torch.sqrt(h)
+            corr_normals = torch.matmul(self.lower_cholesky, normals)
+        else:
+            corr_normals = input_normals
+        
         t = torch.tensor(0.0, device=self.device)
         for i in range(self.num_steps):
             paths[:, i + 1] = paths[:, i] + self.sde.drift(t, paths[:, i]) * h + \
