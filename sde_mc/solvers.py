@@ -96,7 +96,7 @@ class JumpSolver(SdeSolver):
         for i in range(self.num_steps):
             paths_no_jumps[:, i + 1] = paths[:, i] + self.sde.drift(t, paths[:, i]) * h + \
                                        torch.matmul(self.sde.diffusion(t, paths[:, i]), corr_normals[:, i]).squeeze(-1)
-            paths[:, i + 1] = paths[:, i + 1] * (jumps[:, i] + 1)
+            paths[:, i + 1] = paths_no_jumps[:, i + 1] * (jumps[:, i] + 1)
             t += h
 
         if return_normals:
