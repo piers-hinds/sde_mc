@@ -28,14 +28,32 @@ def bs_call(spot, strike, expiry, r, sigma):
     return spot * norm.cdf(d1) - strike * np.exp(-r * expiry) * norm.cdf(d2)
 
 
-def merton_jump_call(spot, strike, expiry, r, sigma, mean_jump, std_jump, rate):
+def merton_jump_call(spot, strike, expiry, r, sigma, alpha, gamma, rate):
+    beta = np.exp(alpha + 0.5 * gamma * gamma) - 1
     partial_sum = 0
     for k in range(40):
-        r_k = r - rate * (mean_jump - 1) + (k * np.log(mean_jump)) / expiry
-        sigma_k = np.sqrt(sigma ** 2 + (k * std_jump ** 2) / expiry)
+        r_k = r - rate * beta + (k * np.log(beta+1)) / expiry
+        sigma_k = np.sqrt(sigma ** 2 + (k * gamma ** 2) / expiry)
         k_fact = np.math.factorial(k)
-        partial_sum += (np.exp(-mean_jump * rate * expiry) * (mean_jump * rate * expiry) ** k / (k_fact)) * \
+        partial_sum += (np.exp(-(beta+1) * rate * expiry) * ((beta+1) * rate * expiry) ** k / k_fact) * \
              bs_call(spot, strike, expiry, r_k, sigma_k)
+    return partial_sum
+
+
+def merton_call(spot, strike, expiry, r, sigma, a, b, std_jump, rate):
+    partial_sum = 0
+    beta = np.exp(a + b*b/2) - 1
+    for k in range(40):
+        d1 = (np.log(spot/strike) + expiry*(r + 0.5*sigma*sigma - rate*beta) + k*(a + b*b)) / (np.sqrt(
+            sigma*sigma*expiry + k*b*b))
+
+        d2 = d1 - (sigma*sigma*expiry + k*b*b) / (np.sqrt(sigma*sigma*expiry + k*b*b))
+
+        k_fact = np.math.factorial(k)
+        moved_spot = spot * np.exp(-rate * beta * expiry + k*(a + 0.5*b*b))
+
+        partial_sum += ((rate * expiry)**k * np.exp(-rate * expiry) / k_fact) * (moved_spot*norm.cdf(d1) - strike *
+            np.exp(-r * expiry)*norm.cdf(d2))
     return partial_sum
 
 
