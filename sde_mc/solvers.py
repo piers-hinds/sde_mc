@@ -78,7 +78,10 @@ class JumpSolver(SdeSolver):
         h = torch.tensor(self.time / self.num_steps, device=self.device)
 
         paths = torch.empty(size=(bs, self.num_steps + 1, self.sde.dim), device=self.device)
+        paths_no_jumps = torch.empty(size=(bs, self.num_steps + 1, self.sde.dim), device=self.device)
+
         paths[:, 0] = self.sde.init_value.unsqueeze(0).repeat(bs, 1).to(self.device)
+        paths_no_jumps[:, 0] = self.sde.init_value.unsqueeze(0).repeat(bs, 1).to(self.device)
 
         normals = torch.randn(size=(bs, self.num_steps, self.sde.noise_dim, 1), device=self.device) * torch.sqrt(h)
         corr_normals = torch.matmul(self.lower_cholesky, normals)
@@ -91,13 +94,13 @@ class JumpSolver(SdeSolver):
 
         t = torch.tensor(0.0, device=self.device)
         for i in range(self.num_steps):
-            paths[:, i + 1] = (paths[:, i] + self.sde.drift(t, paths[:, i]) * h + \
-                               torch.matmul(self.sde.diffusion(t, paths[:, i]), corr_normals[:, i]).squeeze(-1)) * \
-                              (jumps[:, i] + 1)
+            paths_no_jumps[:, i + 1] = paths[:, i] + self.sde.drift(t, paths[:, i]) * h + \
+                                       torch.matmul(self.sde.diffusion(t, paths[:, i]), corr_normals[:, i]).squeeze(-1)
+            paths[:, i + 1] = paths[:, i + 1] * (jumps[:, i] + 1)
             t += h
 
         if return_normals:
-            return paths, (corr_normals, jumps)
+            return paths, (paths_no_jumps, corr_normals, jumps)
         else:
             return paths, None
 
