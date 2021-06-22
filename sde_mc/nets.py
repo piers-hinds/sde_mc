@@ -4,15 +4,15 @@ from torch.utils.data import Dataset
 
 
 class Mlp(nn.Module):
-    def __init__(self, input_size, layer_sizes, output_size, final_activation=None):
+    def __init__(self, input_size, layer_sizes, output_size, activation=nn.Tanh, final_activation=None):
         assert len(layer_sizes) > 0, "At least one hidden layer required."
         super(Mlp, self).__init__()
         self.num_layers = len(layer_sizes)
 
         layers = [nn.BatchNorm1d(input_size), nn.Linear(input_size, layer_sizes[0]), nn.BatchNorm1d(layer_sizes[0]),
-                  nn.Tanh()]
+                  activation()]
         for i in range(self.num_layers-1):
-            layers += [nn.Linear(layer_sizes[i], layer_sizes[i+1]), nn.BatchNorm1d(layer_sizes[i+1]), nn.Tanh()]
+            layers += [nn.Linear(layer_sizes[i], layer_sizes[i+1]), nn.BatchNorm1d(layer_sizes[i+1]), activation()]
         layers += [nn.Linear(layer_sizes[self.num_layers-1], output_size)]
         if final_activation is not None:
             layers += [final_activation()]
