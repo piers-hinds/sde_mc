@@ -1,6 +1,9 @@
 """A part of the pylabyk library: numpytorch.py at https://github.com/yulkang/pylabyk"""
 import torch
 
+def partition(interval, steps, device='cpu'):
+    return torch.tensor([interval * i / steps for i in range(1, steps + 1)], device=device)
+
 def block_diag(m):
     """
     Make a block diagonal matrix along dim=-3
