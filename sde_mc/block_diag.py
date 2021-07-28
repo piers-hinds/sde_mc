@@ -1,8 +1,19 @@
 """A part of the pylabyk library: numpytorch.py at https://github.com/yulkang/pylabyk"""
 import torch
 
-def partition(interval, steps, device='cpu'):
-    return torch.tensor([interval * i / steps for i in range(1, steps + 1)], device=device)
+
+def partition(interval, steps, ends='right', device='cpu'):
+    assert ends in ['right', 'left', 'both', 'none']
+    if ends in ['right', 'both']:
+        right = steps + 1
+    else:
+        right = steps
+    if ends in ['left', 'both']:
+        left = 0
+    else:
+        left = 1
+    return torch.tensor([interval * i / steps for i in range(left, right)], device=device)
+
 
 def block_diag(m):
     """

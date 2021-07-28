@@ -114,8 +114,8 @@ def mc_control_variates(models, opt, solver, trials, steps, payoff, discounter, 
     train_bs, test_bs = bs
     solver.num_steps = train_steps
 
-    train_time_points = partition(solver.time, train_steps, device=solver.device)
-    test_time_points = partition(solver.time, test_steps, device=solver.device)
+    train_time_points = partition(solver.time, train_steps, ends='left', device=solver.device)
+    test_time_points = partition(solver.time, test_steps, ends='left', device=solver.device)
     train_ys, test_ys = discounter(train_time_points), discounter(test_time_points)
 
     # Training

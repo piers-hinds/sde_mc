@@ -4,6 +4,7 @@ from sde_mc import *
 device = 'cuda' if torch.cuda.is_available() else 'cpu'
 print(device)
 
+
 # Model params:
 r = 0.02
 vol = 0.3

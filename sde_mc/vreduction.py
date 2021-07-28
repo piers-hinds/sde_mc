@@ -49,7 +49,6 @@ def train_control_variates(models, opt, dl, jump_mean, rate, time_points, Ys, ep
         run_loss = 0
         for i, (xb, yb) in enumerate(dl):
             opt.zero_grad()
-
             f_in = torch.cat([rep_time_points, xb[0].reshape(dl.batch_size*steps, dim)], dim=-1)
             g_in = torch.cat([rep_time_points, xb[1].reshape(dl.batch_size*steps, dim)], dim=-1)
             f_out = f(f_in).view(dl.batch_size, steps, dim)
