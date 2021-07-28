@@ -1,11 +1,10 @@
 import time
 import numpy as np
 import torch
-import torch.optim as optim
 from torch.utils.data import DataLoader
-from .vreduction import SdeControlVariate, get_preds, train_control_variate
-from .solvers import SdeSolver
-from .nets import NormalPathData
+from .vreduction import train_control_variates, apply_control_variates
+from .nets import NormalJumpsPathData
+from .block_diag import partition
 
 
 class MCStatistics:
@@ -107,99 +106,37 @@ def mc_simple(num_trials, sde_solver, payoff, discount=1, bs=None, return_normal
         return MCStatistics(mn, sd, tt)
 
 
-def mc_control_variate(num_trials, simple_solver, approximator, payoff, discounter, step_factor=5, time_points=None,
-    bs=None):
-    """Run Monte Carlo simulation of an SDE with a control variate
+def mc_control_variates(models, opt, solver, trials, steps, payoff, discounter, jump_mean, rate, bs=(1000, 1000),
+                        epochs=10):
+    # Config
+    train_trials, test_trials = trials
+    train_steps, test_steps = steps
+    train_bs, test_bs = bs
+    solver.num_steps = train_steps
 
-    :param num_trials: tuple (int, int)
-        The number of trials for the approximation and the number of trials for the
-        control variate monte carlo method
+    train_time_points = partition(solver.time, train_steps, device=solver.device)
+    test_time_points = partition(solver.time, test_steps, device=solver.device)
+    train_ys, test_ys = discounter(train_time_points), discounter(test_time_points)
 
-    :param simple_solver: SdeSolver
-        The solver for the Sde with no control variate
+    # Training
+    train_dataloader = simulate_data(train_trials, solver, payoff, discounter, bs=train_bs)
+    training_time, losses = train_control_variates(models, opt, train_dataloader, jump_mean, rate, train_time_points,
+                                                   train_ys, epochs)
 
-    :param approximator: SdeApproximator
-        The approximator for the solution of the Sde
+    # Inference
+    solver.num_steps = test_steps
+    test_dataloader = simulate_data(test_trials, solver, payoff, discounter, bs=test_bs, inference=True)
+    mn, sd, inference_time, _ = apply_control_variates(models, test_dataloader, jump_mean, rate, test_time_points,
+                                                       test_ys)
 
-    :param payoff: Option
-        The payoff function applied to the terminal value - see the Option class
-
-    :param discounter: function(float: time)
-        The discount process to be applied to the payoff
-
-    :param step_factor: int
-        The factor to increase the number of steps used in the initial solver
-
-    :param bs: int
-        The batch size for the monte carlo method
-
-    :return: MCStatistics
-        The relevant statistics from the MC simulation - see the MCStatistics class
-    """
-    if time_points is None:
-        time_points = approximator.time_points
-    simple_trials, cv_trials = num_trials
-    discount = discounter(torch.tensor(simple_solver.time))
-    start = time.time()
-    simple_stats = mc_simple(simple_trials, simple_solver, payoff, discount)
-    approximator.fit(simple_stats.paths, simple_stats.payoffs)
-    cv_sde = SdeControlVariate(base_sde=simple_solver.sde, control_variate=approximator,
-                               time_points=time_points, discounter=discounter)
-    cv_solver = SdeSolver(sde=cv_sde, time=3, num_steps=simple_solver.num_steps*step_factor,
-                          device=simple_solver.device)
-
-    def cv_payoff(spot):
-        return discount * payoff(spot[:, :simple_solver.sde.dim]) + spot[:, simple_solver.sde.dim]
-
-    cv_stats = mc_simple(cv_trials, cv_solver, cv_payoff, discount=1, bs=bs)
-    print('Time for final MC:', cv_stats.time_elapsed)
-    end = time.time()
-    cv_stats.time_elapsed = end-start
-    return cv_stats
+    return MCStatistics(mn, sd, training_time+inference_time)
 
 
-def mc_min_variance(trials, solver, model, payoff, discounter, bs, step_factor=5, pre_trained=False, epochs=10):
-    # Setup
-    init_trials, final_trials = trials if not pre_trained else (0, trials)
-    init_bs, final_bs = bs
-    steps = solver.num_steps
-    solver.num_steps = int(steps / step_factor)
-    ts = torch.tensor([solver.time * i / solver.num_steps for i in range(solver.num_steps)], device=solver.device)
-    discounts = discounter(ts)
-    dim = solver.sde.dim
-    end_time = torch.tensor(solver.time)
-
-    start = time.time()
-    # MC with no control variate on coarse grid
-    mc_stats = mc_simple(num_trials=init_trials, sde_solver=solver, payoff=payoff,
-                         discount=discounter(end_time), return_normals=True)
-    mc_stats.print()
-    paths, payoffs, normals = mc_stats.paths, mc_stats.payoffs, mc_stats.normals.squeeze(-1)
-
-    # Set up data
-    data = NormalPathData(paths, payoffs, normals)
-    dl = DataLoader(data, batch_size=init_bs, shuffle=True, drop_last=True)
-    adam = optim.Adam(model.parameters())
-
-    # Train net
-    train_control_variate(model, dl, adam, ts, dim, Ys=discounts, epochs=epochs)
-
-    # New MC with finer time grid
-    solver.num_steps = steps
-    new_ts = torch.tensor([3*i/solver.num_steps for i in range(solver.num_steps)], device=solver.device)
-    new_discounts = discounter(new_ts)
-
-    new_mc_stats = mc_simple(num_trials=final_trials, sde_solver=solver, payoff=payoff,
-                             discount=discounter(end_time), return_normals=True)
-    new_paths, new_payoffs, new_normals = new_mc_stats.paths, new_mc_stats.payoffs, new_mc_stats.normals.squeeze(-1)
-
-    new_data = NormalPathData(new_paths, new_payoffs, new_normals)
-    new_dl = DataLoader(new_data, batch_size=final_bs, shuffle=False)
-
-    # Get predictions of control variate
-    mn, sd = get_preds(model, new_dl, new_ts, dim, new_Ys=new_discounts)
-
-    # Return mean, std
-    end = time.time()
-    tt = end-start
-    return MCStatistics(mn, sd, tt)
+def simulate_data(trials, solver, payoff, discounter, bs=1000, inference=False):
+    if inference:
+        assert not trials % bs, 'Batch size should partition total trials evenly'
+    mc_stats = mc_simple(trials, solver, payoff, discounter(solver.time), return_normals=True)
+    paths, (paths_no_jumps, normals, jumps) = mc_stats.paths, mc_stats.normals
+    payoffs = mc_stats.payoffs
+    dset = NormalJumpsPathData(paths, paths_no_jumps, payoffs, normals.squeeze(-1), jumps)
+    return DataLoader(dset, batch_size=bs, shuffle=not inference, drop_last=not inference)
