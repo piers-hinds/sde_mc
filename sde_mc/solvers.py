@@ -55,6 +55,33 @@ class SdeSolver:
             return paths, None
 
 
+class FastSdeSolver(SdeSolver):
+    def euler(self, bs=1, return_normals=False, input_normals=None):
+        assert bs >=1
+        bs = int(bs)
+        h = torch.tensor(self.time / self.num_steps, device=self.device)
+
+        paths = torch.empty(size=(bs, self.num_steps + 1, self.sde.dim), device=self.device)
+        paths[:, 0] = self.sde.init_value.unsqueeze(0).repeat(bs, 1).to(self.device)
+        
+        if input_normals is None:
+            normals = torch.randn(size=(bs, self.num_steps, self.sde.dim, 1), device=self.device) * torch.sqrt(h)
+            corr_normals = torch.matmul(self.lower_cholesky, normals)
+        else:
+            corr_normals = input_normals
+        
+        t = torch.tensor(0.0, device=self.device)
+        for i in range(self.num_steps):
+            paths[:, i + 1] = paths[:, i] + self.sde.drift(t, paths[:, i]) * h + self.sde.diffusion(t, paths[:, i]) * corr_normals[:, i].squeeze(-1)
+
+            t += h
+
+        if return_normals:
+            return paths, corr_normals
+        else:
+            return paths, None
+
+
 class JumpSolver(SdeSolver):
     """A class for solving SDEs which have jumps"""
 
