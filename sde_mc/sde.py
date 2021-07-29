@@ -141,6 +141,27 @@ class Gbm(Sde):
         return torch.diag_embed(self.sigma * x)
 
 
+class FastGbm(FastSde):
+    """Multi-dimensional GBM with possible correlation"""
+    def __init__(self, mu, sigma, init_value, dim, corr_matrix=None):
+        """
+        :param mu: torch.tensor, the drifts of the process
+        :param sigma: torch.tensor, the volatilities of the process
+        :param init_value: torch.tensor, the initial value of the process
+        :param dim: torch.tensor, the dimension of the GBM
+        :param corr_matrix: torch.tensor, the correlation matrix
+        """
+        super(FastGbm, self).__init__(init_value, dim, corr_matrix)
+        self.mu = mu
+        self.sigma = sigma
+
+    def drift(self, t, x):
+        return self.mu * x
+
+    def diffusion(self, t, x):
+        return self.sigma * x
+
+
 class Merton(SdeLogNormalJumps):
     """One-dimensional Merton jump-diffusion model"""
     def __init__(self, mu, sigma, init_value, rate, mean, std):
