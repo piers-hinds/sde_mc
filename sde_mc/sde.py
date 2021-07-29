@@ -42,6 +42,45 @@ class Sde(ABC):
         pass
 
 
+class FastSde(ABC):
+    """An abstract base class for SDEs where the dimension is the same as the noise dimension,
+    allowing for faster simulation
+    """
+
+    def __init__(self, init_value, dim, corr_matrix=None):
+        """
+        :param init_value: torch.tensor, the initial value of the process
+        :param dim: int, the dimension of the process
+        :param noise_dim: int, dimension of the Wiener process
+        :param corr_matrix: torch.tensor, the correlation matrix for the Wiener processes. If None, independence is
+        assumed
+        """
+        self.init_value = init_value
+        self.dim = dim
+        if corr_matrix is None:
+            self.corr_matrix = torch.eye(self.dim)
+        else:
+            self.corr_matrix = corr_matrix
+
+    @abstractmethod
+    def drift(self, t, x):
+        """YOUR CODE HERE
+        :param t: torch.tensor, the current time
+        :param x: torch.tensor (bs, dim), the current value of the process
+        :return: torch.tensor (bs, dim), the drift vector of the process at (t, x)
+        """
+        pass
+
+    @abstractmethod
+    def diffusion(self, t, x):
+        """YOUR CODE HERE
+        :param t: torch.tensor, the current time
+        :param x: torch.tensor (bs, dim), the current value of the process
+        :return: torch.tensor (bs, dim), the diffusion vector of the process at (t, x)
+        """
+        pass
+
+    
 class SdeJumps(Sde):
     """Abstract class for SDEs with jumps"""
 
