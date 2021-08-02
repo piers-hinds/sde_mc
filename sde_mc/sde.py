@@ -1,66 +1,18 @@
 from abc import ABC, abstractmethod
 import torch
 import numpy as np
-from .block_diag import block_diag
 
 
 class Sde(ABC):
-    """An abstract base class for SDEs"""
-
-    def __init__(self, init_value, dim, noise_dim, corr_matrix=None):
-        """
-        :param init_value: torch.tensor, the initial value of the process
-        :param dim: int, the dimension of the process
-        :param noise_dim: int, dimension of the Wiener process
-        :param corr_matrix: torch.tensor, the correlation matrix for the Wiener processes. If None, independence is
-        assumed
-        """
-        self.init_value = init_value
-        self.dim = dim
-        self.noise_dim = noise_dim
-        if corr_matrix is None:
-            self.corr_matrix = torch.eye(self.noise_dim)
-        else:
-            self.corr_matrix = corr_matrix
-
-    @abstractmethod
-    def drift(self, t, x):
-        """YOUR CODE HERE
-        :param t: torch.tensor, the current time
-        :param x: torch.tensor (bs, dim), the current value of the process
-        :return: torch.tensor (bs, dim), the drift vector of the process at (t, x)
-        """
-        pass
-
-    @abstractmethod
-    def diffusion(self, t, x):
-        """YOUR CODE HERE
-        :param t: torch.tensor, the current time
-        :param x: torch.tensor (bs, dim), the current value of the process
-        :return: torch.tensor (bs, dim, noise_dim), the diffusion matrix of the process at (t, x)
-        """
-        pass
-
-
-class FastSde(ABC):
-    """An abstract base class for SDEs where the dimension is the same as the noise dimension,
-    allowing for faster simulation
-    """
+    """Abstract base class for SDEs driven by a Wiener process and a Poisson process"""
 
     def __init__(self, init_value, dim, corr_matrix=None):
-        """
-        :param init_value: torch.tensor, the initial value of the process
-        :param dim: int, the dimension of the process
-        :param noise_dim: int, dimension of the Wiener process
-        :param corr_matrix: torch.tensor, the correlation matrix for the Wiener processes. If None, independence is
-        assumed
-        """
         self.init_value = init_value
         self.dim = dim
-        if corr_matrix is None:
-            self.corr_matrix = torch.eye(self.dim)
-        else:
+        if corr_matrix is not None:
             self.corr_matrix = corr_matrix
+        else:
+            self.corr_matrix = torch.eye(dim)
 
     @abstractmethod
     def drift(self, t, x):
@@ -80,48 +32,65 @@ class FastSde(ABC):
         """
         pass
 
-    
-class SdeJumps(Sde):
-    """Abstract class for SDEs with jumps"""
+    @abstractmethod
+    def jumps(self, t, x):
+        """YOUR CODE HERE
+        :param t: torch.tensor, the current time
+        :param x: torch.tensor (bs, dim), the current value of the process
+        :return: torch.tensor (bs, dim), the jump coefficient of the process at (t, x)
+        """
+        pass
 
-    def __init__(self, base_sde, rate):
-        super(SdeJumps, self).__init__(base_sde.init_value, 1, 1, None)
-        self.base_sde = base_sde
-        self.rate = rate
+    @abstractmethod
+    def sample_jumps(self, size, device):
+        """YOUR CODE HERE
+        :param size: tuple of ints, the size (shape) of the output of sampled jumps
+        :param device: str, the device on which to sample the jumps
+        :return: torch.tensor, sampled jumps
+        """
+        pass
 
+    @abstractmethod
+    def jump_mean(self):
+        """YOUR CODE HERE
+        :return: float, the mean of the jumps
+        """
+        pass
+
+    @abstractmethod
+    def jump_rate(self):
+        """YOUR CODE HERE
+        :return: float, the rate of the Poisson process
+        """
+        pass
+
+
+class DiffusionSde(Sde):
+    """Abstract class for SDEs with only a drift and diffusion component"""
+    @abstractmethod
     def drift(self, t, x):
-        return self.base_sde.drift(t, x)
+        pass
 
+    @abstractmethod
     def diffusion(self, t, x):
-        return self.base_sde.diffusion(t, x)
+        pass
 
-    @abstractmethod
     def jumps(self, t, x):
-        """The function coefficient of the compound Poisson process"""
-        pass
+        return None
 
-    @abstractmethod
-    def mean_jumps(self):
-        """The mean of the jump sizes"""
-        pass
+    def sample_jumps(self, size, device):
+        return None
 
+    def jump_mean(self):
+        return None
 
-class SdeLogNormalJumps(SdeJumps):
-    def __init__(self, base_sde, rate, mean, std):
-        super(SdeLogNormalJumps, self).__init__(base_sde, rate)
-        self.mean = mean
-        self.std = std
-
-    @abstractmethod
-    def jumps(self, t, x):
-        pass
-
-    def mean_jumps(self):
-        return np.exp(self.mean + 0.5 * self.std * self.std) - 1
+    def jump_rate(self):
+        return 0
 
 
-class Gbm(Sde):
+class Gbm(DiffusionSde):
     """Multi-dimensional GBM with possible correlation"""
+
     def __init__(self, mu, sigma, init_value, dim, corr_matrix=None):
         """
         :param mu: torch.tensor, the drifts of the process
@@ -130,28 +99,7 @@ class Gbm(Sde):
         :param dim: torch.tensor, the dimension of the GBM
         :param corr_matrix: torch.tensor, the correlation matrix
         """
-        super(Gbm, self).__init__(init_value, dim, dim, corr_matrix)
-        self.mu = mu
-        self.sigma = sigma
-
-    def drift(self, t, x):
-        return self.mu * x
-
-    def diffusion(self, t, x):
-        return torch.diag_embed(self.sigma * x)
-
-
-class FastGbm(FastSde):
-    """Multi-dimensional GBM with possible correlation"""
-    def __init__(self, mu, sigma, init_value, dim, corr_matrix=None):
-        """
-        :param mu: torch.tensor, the drifts of the process
-        :param sigma: torch.tensor, the volatilities of the process
-        :param init_value: torch.tensor, the initial value of the process
-        :param dim: torch.tensor, the dimension of the GBM
-        :param corr_matrix: torch.tensor, the correlation matrix
-        """
-        super(FastGbm, self).__init__(init_value, dim, corr_matrix)
+        super(Gbm, self).__init__(init_value, dim, corr_matrix)
         self.mu = mu
         self.sigma = sigma
 
@@ -162,79 +110,69 @@ class FastGbm(FastSde):
         return self.sigma * x
 
 
-class Merton(SdeLogNormalJumps):
-    """One-dimensional Merton jump-diffusion model"""
-    def __init__(self, mu, sigma, init_value, rate, mean, std):
+class LogNormalJumpsSde(Sde):
+    """SDE with jumps that have shifted log-normal distribution"""
+
+    def __init__(self, rate, alpha, gamma, init_value, dim, corr_matrix=None):
         """
-        :param mu: torch.tensor, the drift of the process
-        :param sigma: torch.tensor, the volatility of the process
+        :param rate: float, the rate of the Poisson process
+        :param alpha: float, the mean of the jumps
+        :param gamma: float, the standard deviation of the jumps
         :param init_value: torch.tensor, the initial value of the process
-        :param rate: torch.tensor, the rate of the Poisson process
-        :param mean: torch.tensor, the mean of the jumps
-        :param std: torch.tensor, the standard deviation of the jumps
+        :param dim: int, the dimension of the SDE
+        :param corr_matrix: torch.tensor, the correlation matrix
         """
-        super(Merton, self).__init__(Gbm(mu, sigma, init_value, 1), rate, mean, std)
+        super(LogNormalJumpsSde, self).__init__(init_value, dim, corr_matrix)
+        self.rate = rate
+        self.alpha = alpha
+        self.gamma = gamma
+
+    @abstractmethod
+    def drift(self, t, x):
+        pass
+
+    @abstractmethod
+    def diffusion(self, t, x):
+        pass
+
+    @abstractmethod
+    def jumps(self, t, x):
+        pass
+
+    def sample_jumps(self, size, device):
+        return (torch.randn(size=size, device=device) * self.gamma + self.alpha).exp() - 1
+
+    def jump_mean(self):
+        return np.exp(self.alpha + 0.5 * self.gamma * self.gamma) - 1
+
+    def jump_rate(self):
+        return self.rate
+
+
+class Merton(LogNormalJumpsSde):
+    """Merton jump-diffusion model (GBM with shifted log-normal jumps)"""
+
+    def __init__(self, mu, sigma, rate, alpha, gamma, init_value, dim, corr_matrix=None):
+        """
+        :param mu: float, the drift of the process
+        :param sigma: float, the volatility of the process
+        :param rate: float, the rate of the Poisson process
+        :param alpha: float, the mean of the jumps
+        :param gamma: float, the standard deviation of the jumps
+        :param init_value: torch.tensor, the initial value of the process
+        :param dim: int, the dimension of the SDE
+        :param corr_matrix: torch.tensor, the correlation matrix
+        """
+        self.mu = mu
+        self.sigma = sigma
+        super(Merton, self).__init__(rate, alpha, gamma, init_value, dim, corr_matrix)
+
+    def drift(self, t, x):
+        return (self.mu - self.rate * self.jump_mean()) * x
+
+    def diffusion(self, t, x):
+        return self.sigma * x
 
     def jumps(self, t, x):
         return x
 
-
-class Heston(Sde):
-    """The (log) Heston model under EMM dynamics"""
-
-    def __init__(self, r, kappa, theta, xi, rho, init_value):
-        """
-        :param r: float, the risk-free rate
-        :param kappa: float, mean-reversion rate of the variance process
-        :param theta: float, the long-run mean of the variance process
-        :param xi: float, the vol-of-vol
-        :param rho: float, the correlation between the two Wiener processes
-        :param init_value: torch.tensor (2), the initial spot price and the initial variance
-        """
-        assert 2 * kappa * theta > xi**2, "Feller condition not satisfied"
-        super(Heston, self).__init__(init_value=init_value, dim=2, noise_dim=2,
-                                     corr_matrix=torch.tensor([[1., rho], [rho, 1.]]))
-        self.r = r
-        self.kappa = kappa
-        self.theta = theta
-        self.xi = xi
-
-    def drift(self, t, x):
-        return torch.cat([self.r - 0.5 * torch.exp(x[:, 1]).unsqueeze(1),
-                          ((self.kappa * (self.theta - torch.exp(x[:, 1])) - 0.5*self.xi**2) /
-                           torch.exp(x[:, 1])).unsqueeze(1)], dim=1)
-
-    def diffusion(self, t, x):
-        return torch.diag_embed(torch.cat([torch.sqrt(torch.exp(x[:, 1])).unsqueeze(1),
-                                           self.xi / torch.sqrt(torch.exp(x[:, 1])).unsqueeze(1)], dim=1))
-
-
-class MultiHeston(Sde):
-    """Multiple Heston models"""
-
-    def __init__(self, r, kappa, theta, xi, rho, init_value, dim):
-        """
-        :param r: float, the risk-free rate
-        :param kappa: float, mean-reversion rate of the variance process
-        :param theta: float, the long-run mean of the variance process
-        :param xi: float, the vol-of-vol
-        :param rho: float, the correlation between the two Wiener processes
-        :param init_value: torch.tensor (2), the initial spot price and the initial variance
-        """
-        assert torch.all(torch.gt(2 * kappa * theta, xi ** 2)), "Feller condition not satisfied"
-        super(MultiHeston, self).__init__(init_value=init_value, dim=2*dim, noise_dim=2*dim,
-                                          corr_matrix=torch.tensor([[1., rho[0], 0, 0], [rho[0], 1., 0, 0],
-                                                                    [0, 0, 1, rho[1]], [0, 0, rho[1], 1]]))
-        self.r = r
-        self.kappa = kappa
-        self.theta = theta
-        self.xi = xi
-
-        self.h1 = Heston(r[0], kappa[0], theta[0], xi[0], rho[0], init_value[:2])
-        self.h2 = Heston(r[1], kappa[1], theta[1], xi[1], rho[1], init_value[2:4])
-
-    def drift(self, t, x):
-        return torch.cat([self.h1.drift(t, x), self.h2.drift(t, x)], dim=-1)
-
-    def diffusion(self, t, x):
-        return block_diag([self.h1.diffusion(t, x), self.h2.diffusion(t, x)])

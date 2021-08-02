@@ -2,8 +2,9 @@ import time
 import numpy as np
 import torch
 from torch.utils.data import DataLoader
-from .vreduction import train_control_variates, apply_control_variates
-from .nets import NormalJumpsPathData
+from .vreduction import train_control_variates, apply_control_variates, train_diffusion_control_variate, \
+    apply_diffusion_control_variate
+from .nets import NormalJumpsPathData, NormalPathData
 from .block_diag import partition
 
 
@@ -106,9 +107,10 @@ def mc_simple(num_trials, sde_solver, payoff, discount=1, bs=None, return_normal
         return MCStatistics(mn, sd, tt)
 
 
-def mc_control_variates(models, opt, solver, trials, steps, payoff, discounter, jump_mean, rate, bs=(1000, 1000),
-                        epochs=10):
+def mc_control_variates(models, opt, solver, trials, steps, payoff, discounter, bs=(1000, 1000), epochs=10):
     # Config
+    jump_mean = solver.sde.jump_mean()
+    rate = solver.sde.jump_rate()
     train_trials, test_trials = trials
     train_steps, test_steps = steps
     train_bs, test_bs = bs
@@ -120,14 +122,21 @@ def mc_control_variates(models, opt, solver, trials, steps, payoff, discounter, 
 
     # Training
     train_dataloader = simulate_data(train_trials, solver, payoff, discounter, bs=train_bs)
-    training_time, losses = train_control_variates(models, opt, train_dataloader, jump_mean, rate, train_time_points,
-                                                   train_ys, epochs)
+    if solver.has_jumps:
+        training_time, losses = train_control_variates(models, opt, train_dataloader, jump_mean, rate, train_time_points,
+                                                       train_ys, epochs)
+    else:
+        training_time, losses = train_diffusion_control_variate(models, opt, train_dataloader, train_time_points,
+                                                                train_ys, epochs)
 
     # Inference
     solver.num_steps = test_steps
     test_dataloader = simulate_data(test_trials, solver, payoff, discounter, bs=test_bs, inference=True)
-    mn, sd, inference_time, _ = apply_control_variates(models, test_dataloader, jump_mean, rate, test_time_points,
-                                                       test_ys)
+    if solver.has_jumps:
+        mn, sd, inference_time, _ = apply_control_variates(models, test_dataloader, jump_mean, rate, test_time_points,
+                                                           test_ys)
+    else:
+        mn, sd, inference_time, _ = apply_diffusion_control_variate(models, test_dataloader, test_time_points, test_ys)
 
     return MCStatistics(mn, sd, training_time+inference_time)
 
@@ -136,7 +145,12 @@ def simulate_data(trials, solver, payoff, discounter, bs=1000, inference=False):
     if inference:
         assert not trials % bs, 'Batch size should partition total trials evenly'
     mc_stats = mc_simple(trials, solver, payoff, discounter(solver.time), return_normals=True)
-    paths, (paths_no_jumps, normals, jumps) = mc_stats.paths, mc_stats.normals
-    payoffs = mc_stats.payoffs
-    dset = NormalJumpsPathData(paths, paths_no_jumps, payoffs, normals.squeeze(-1), jumps)
+    if solver.has_jumps:
+        paths, (paths_no_jumps, normals, jumps) = mc_stats.paths, mc_stats.normals
+        payoffs = mc_stats.payoffs
+        dset = NormalJumpsPathData(paths, paths_no_jumps, payoffs, normals.squeeze(-1), jumps)
+    else:
+        paths, (_, normals, _) = mc_stats.paths, mc_stats.normals
+        payoffs = mc_stats.payoffs
+        dset = NormalPathData(paths, payoffs, normals.squeeze(-1))
     return DataLoader(dset, batch_size=bs, shuffle=not inference, drop_last=not inference)
