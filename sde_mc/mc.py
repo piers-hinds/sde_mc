@@ -121,7 +121,7 @@ def mc_control_variates(models, opt, solver, trials, steps, payoff, discounter, 
     train_ys, test_ys = discounter(train_time_points), discounter(test_time_points)
 
     # Training
-    train_dataloader = simulate_data(train_trials, solver, payoff, discounter, bs=train_bs)
+    train_dataloader, train_sim_time = simulate_data(train_trials, solver, payoff, discounter, bs=train_bs)
     if solver.has_jumps:
         training_time, losses = train_control_variates(models, opt, train_dataloader, jump_mean, rate, train_time_points,
                                                        train_ys, epochs)
@@ -131,17 +131,18 @@ def mc_control_variates(models, opt, solver, trials, steps, payoff, discounter, 
 
     # Inference
     solver.num_steps = test_steps
-    test_dataloader = simulate_data(test_trials, solver, payoff, discounter, bs=test_bs, inference=True)
+    test_dataloader, test_sim_time = simulate_data(test_trials, solver, payoff, discounter, bs=test_bs, inference=True)
     if solver.has_jumps:
         mn, sd, inference_time, _ = apply_control_variates(models, test_dataloader, jump_mean, rate, test_time_points,
                                                            test_ys)
     else:
         mn, sd, inference_time, _ = apply_diffusion_control_variate(models, test_dataloader, test_time_points, test_ys)
 
-    return MCStatistics(mn, sd, training_time+inference_time)
+    return MCStatistics(mn, sd, train_sim_time+training_time+test_sim_time+inference_time)
 
 
 def simulate_data(trials, solver, payoff, discounter, bs=1000, inference=False):
+    start = time.time()
     if inference:
         assert not trials % bs, 'Batch size should partition total trials evenly'
     mc_stats = mc_simple(trials, solver, payoff, discounter(solver.time), return_normals=True)
@@ -153,4 +154,5 @@ def simulate_data(trials, solver, payoff, discounter, bs=1000, inference=False):
         paths, (_, normals, _) = mc_stats.paths, mc_stats.normals
         payoffs = mc_stats.payoffs
         dset = NormalPathData(paths, payoffs, normals.squeeze(-1))
-    return DataLoader(dset, batch_size=bs, shuffle=not inference, drop_last=not inference)
+    end = time.time()
+    return DataLoader(dset, batch_size=bs, shuffle=not inference, drop_last=not inference), end-start
