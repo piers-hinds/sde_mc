@@ -1,4 +1,5 @@
 import torch
+from .block_diag import solve_quadratic
 
 
 class SdeSolver:
