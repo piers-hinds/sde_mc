@@ -111,6 +111,6 @@ class SdeSolver:
                 sol = solve_quadratic(coefs)
                 paths[:, i + 1, 1] = sol * sol
                 t += h
-        return paths, corr_normals
+        return paths, (_, corr_normals, _)
 
 
