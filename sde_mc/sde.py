@@ -6,9 +6,10 @@ import numpy as np
 class Sde(ABC):
     """Abstract base class for SDEs driven by a Wiener process and a Poisson process"""
 
-    def __init__(self, init_value, dim, corr_matrix=None):
+    def __init__(self, init_value, dim, corr_matrix=None, method='Euler'):
         self.init_value = init_value
         self.dim = dim
+        self.simulation_method = method
         if corr_matrix is not None:
             self.corr_matrix = corr_matrix
         else:
@@ -91,7 +92,7 @@ class DiffusionSde(Sde):
 class Gbm(DiffusionSde):
     """Multi-dimensional GBM with possible correlation"""
 
-    def __init__(self, mu, sigma, init_value, dim, corr_matrix=None):
+    def __init__(self, mu, sigma, init_value, dim, corr_matrix=None, method='Euler'):
         """
         :param mu: torch.tensor, the drifts of the process
         :param sigma: torch.tensor, the volatilities of the process
@@ -99,7 +100,7 @@ class Gbm(DiffusionSde):
         :param dim: torch.tensor, the dimension of the GBM
         :param corr_matrix: torch.tensor, the correlation matrix
         """
-        super(Gbm, self).__init__(init_value, dim, corr_matrix)
+        super(Gbm, self).__init__(init_value, dim, corr_matrix, method)
         self.mu = mu
         self.sigma = sigma
 
@@ -113,7 +114,7 @@ class Gbm(DiffusionSde):
 class LogNormalJumpsSde(Sde):
     """SDE with jumps that have shifted log-normal distribution"""
 
-    def __init__(self, rate, alpha, gamma, init_value, dim, corr_matrix=None):
+    def __init__(self, rate, alpha, gamma, init_value, dim, corr_matrix=None, method='Euler'):
         """
         :param rate: float, the rate of the Poisson process
         :param alpha: float, the mean of the jumps
@@ -122,7 +123,7 @@ class LogNormalJumpsSde(Sde):
         :param dim: int, the dimension of the SDE
         :param corr_matrix: torch.tensor, the correlation matrix
         """
-        super(LogNormalJumpsSde, self).__init__(init_value, dim, corr_matrix)
+        super(LogNormalJumpsSde, self).__init__(init_value, dim, corr_matrix, method)
         self.rate = rate
         self.alpha = alpha
         self.gamma = gamma
@@ -152,7 +153,7 @@ class LogNormalJumpsSde(Sde):
 class Merton(LogNormalJumpsSde):
     """Merton jump-diffusion model (GBM with shifted log-normal jumps)"""
 
-    def __init__(self, mu, sigma, rate, alpha, gamma, init_value, dim, corr_matrix=None):
+    def __init__(self, mu, sigma, rate, alpha, gamma, init_value, dim, corr_matrix=None, method='Euler'):
         """
         :param mu: float, the drift of the process
         :param sigma: float, the volatility of the process
@@ -165,7 +166,7 @@ class Merton(LogNormalJumpsSde):
         """
         self.mu = mu
         self.sigma = sigma
-        super(Merton, self).__init__(rate, alpha, gamma, init_value, dim, corr_matrix)
+        super(Merton, self).__init__(rate, alpha, gamma, init_value, dim, corr_matrix, method)
 
     def drift(self, t, x):
         return (self.mu - self.rate * self.jump_mean()) * x
