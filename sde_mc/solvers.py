@@ -86,30 +86,30 @@ class SdeSolver:
         else:
             return paths, None
         
-        def heston(self, bs=1, return_normals=False):
-            """Custom scheme specifically for the Heston model. The asset price is simualted by the explicit 
-            Euler scheme, while the variance is simulated using the fully implicit Euler scheme to preserve 
-            positivity."""
-            assert bs >= 1, "Batch size must at least one"
-            bs = int(bs)
+    def heston(self, bs=1, return_normals=False):
+        """Custom scheme specifically for the Heston model. The asset price is simualted by the explicit 
+        Euler scheme, while the variance is simulated using the fully implicit Euler scheme to preserve 
+        positivity."""
+        assert bs >= 1, "Batch size must at least one"
+        bs = int(bs)
 
-            h = torch.tensor(self.time / self.num_steps, device=self.device)
+        h = torch.tensor(self.time / self.num_steps, device=self.device)
 
-            paths = torch.empty(size=(bs, self.num_steps + 1, self.sde.dim), device=self.device)
+        paths = torch.empty(size=(bs, self.num_steps + 1, self.sde.dim), device=self.device)
 
-            paths[:, 0] = self.sde.init_value.unsqueeze(0).repeat(bs, 1).to(self.device)
+        paths[:, 0] = self.sde.init_value.unsqueeze(0).repeat(bs, 1).to(self.device)
 
-            corr_normals = self.sample_corr_normals(size=(bs, self.num_steps, self.sde.dim, 1), h=h)
+        corr_normals = self.sample_corr_normals(size=(bs, self.num_steps, self.sde.dim, 1), h=h)
 
-            t = torch.tensor(0.0, device=self.device)
+        t = torch.tensor(0.0, device=self.device)
 
-            for i in range(self.num_steps):
-                    paths[:, i + 1] = paths[:, i] + self.sde.drift(t, paths[:, i]) * h + \
-                                      self.sde.diffusion(t, paths[:, i]) * corr_normals[:, i].squeeze(-1)
-                    coefs = self.sde.quadratic_parameters(paths[:, i, 1], h, corr_normals[:, i, 1].squeeze(-1))
-                    sol = solve_quadratic(coefs)
-                    paths[:, i + 1, 1] = sol * sol
-                    t += h
-            return paths, corr_normals
+        for i in range(self.num_steps):
+                paths[:, i + 1] = paths[:, i] + self.sde.drift(t, paths[:, i]) * h + \
+                                  self.sde.diffusion(t, paths[:, i]) * corr_normals[:, i].squeeze(-1)
+                coefs = self.sde.quadratic_parameters(paths[:, i, 1], h, corr_normals[:, i, 1].squeeze(-1))
+                sol = solve_quadratic(coefs)
+                paths[:, i + 1, 1] = sol * sol
+                t += h
+        return paths, corr_normals
 
 
