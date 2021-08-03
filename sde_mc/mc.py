@@ -74,7 +74,7 @@ def mc_simple(num_trials, sde_solver, payoff, discount=1, bs=None, return_normal
     """
     if not bs:
         start = time.time()
-        out, normals = sde_solver.euler(bs=num_trials, return_normals=return_normals)
+        out, normals = sde_solver.solve(bs=num_trials, return_normals=return_normals)
         spots = out[:, sde_solver.num_steps]
         payoffs = payoff(spots) * discount
 
@@ -93,7 +93,7 @@ def mc_simple(num_trials, sde_solver, payoff, discount=1, bs=None, return_normal
                 bs = remaining_trials
 
             remaining_trials -= bs
-            out, normals = sde_solver.euler(bs=bs, return_normals=False)
+            out, normals = sde_solver.solve(bs=bs, return_normals=False)
             spots = out[:, sde_solver.num_steps]
             payoffs = payoff(spots) * discount
 
