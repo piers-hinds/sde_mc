@@ -6,7 +6,7 @@ import numpy as np
 class Sde(ABC):
     """Abstract base class for SDEs driven by a Wiener process and a Poisson process"""
 
-    def __init__(self, init_value, dim, corr_matrix=None, method='Euler'):
+    def __init__(self, init_value, dim, corr_matrix=None, method='euler'):
         self.init_value = init_value
         self.dim = dim
         self.simulation_method = method
@@ -92,7 +92,7 @@ class DiffusionSde(Sde):
 class Gbm(DiffusionSde):
     """Multi-dimensional GBM with possible correlation"""
 
-    def __init__(self, mu, sigma, init_value, dim, corr_matrix=None, method='Euler'):
+    def __init__(self, mu, sigma, init_value, dim, corr_matrix=None, method='euler'):
         """
         :param mu: torch.tensor, the drifts of the process
         :param sigma: torch.tensor, the volatilities of the process
@@ -114,7 +114,7 @@ class Gbm(DiffusionSde):
 class LogNormalJumpsSde(Sde):
     """SDE with jumps that have shifted log-normal distribution"""
 
-    def __init__(self, rate, alpha, gamma, init_value, dim, corr_matrix=None, method='Euler'):
+    def __init__(self, rate, alpha, gamma, init_value, dim, corr_matrix=None, method='euler'):
         """
         :param rate: float, the rate of the Poisson process
         :param alpha: float, the mean of the jumps
@@ -153,7 +153,7 @@ class LogNormalJumpsSde(Sde):
 class Merton(LogNormalJumpsSde):
     """Merton jump-diffusion model (GBM with shifted log-normal jumps)"""
 
-    def __init__(self, mu, sigma, rate, alpha, gamma, init_value, dim, corr_matrix=None, method='Euler'):
+    def __init__(self, mu, sigma, rate, alpha, gamma, init_value, dim, corr_matrix=None, method='euler'):
         """
         :param mu: float, the drift of the process
         :param sigma: float, the volatility of the process
