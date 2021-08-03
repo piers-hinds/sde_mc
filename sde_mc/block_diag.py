@@ -41,3 +41,11 @@ def attach_dim(v, n_dim_to_prepend=0, n_dim_to_append=0):
         torch.Size([1] * n_dim_to_prepend)
         + v.shape
         + torch.Size([1] * n_dim_to_append))
+
+
+def solve_quadratic(coefficients):
+    """Solves quadratics across batches, returns maxmimum root"""
+    a, b, c = coefficients
+    sol1 = (- b + torch.sqrt(b * b - 4 * a * c) ) / (2 * a)
+    sol2 = (- b - torch.sqrt(b * b - 4 * a * c) ) / (2 * a)
+    return torch.maximum(sol1, sol2)
