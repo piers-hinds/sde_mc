@@ -34,10 +34,11 @@ class Sde(ABC):
         pass
 
     @abstractmethod
-    def jumps(self, t, x):
+    def jumps(self, t, x, jumps):
         """YOUR CODE HERE
         :param t: torch.tensor, the current time
         :param x: torch.tensor (bs, dim), the current value of the process
+        :param jumps: torch.tensor (bs, dim), the current jump sizes
         :return: torch.tensor (bs, dim), the jump coefficient of the process at (t, x)
         """
         pass
@@ -76,7 +77,7 @@ class DiffusionSde(Sde):
     def diffusion(self, t, x):
         pass
 
-    def jumps(self, t, x):
+    def jumps(self, t, x, jumps):
         return None
 
     def sample_jumps(self, size, device):
@@ -161,7 +162,7 @@ class LogNormalJumpsSde(Sde):
         pass
 
     @abstractmethod
-    def jumps(self, t, x):
+    def jumps(self, t, x, jumps):
         pass
 
     def sample_jumps(self, size, device):
@@ -198,6 +199,6 @@ class Merton(LogNormalJumpsSde):
     def diffusion(self, t, x):
         return self.sigma * x
 
-    def jumps(self, t, x):
-        return x
+    def jumps(self, t, x, jumps):
+        return x * jumps
 
