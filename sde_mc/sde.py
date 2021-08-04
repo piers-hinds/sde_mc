@@ -109,6 +109,30 @@ class Gbm(DiffusionSde):
 
     def diffusion(self, t, x):
         return self.sigma * x
+    
+
+class Heston(DiffusionSde):
+    def __init__(self, r, kappa, theta, xi, rho, init_value):
+        assert 2 * kappa * theta > xi**2
+        corr_matrix = torch.tensor([[1., rho], [rho, 1.]])
+        super(Heston, self).__init__(init_value, 2, corr_matrix)
+        self.simulation_method = 'heston'
+        self.r = r
+        self.kappa = kappa
+        self.theta = theta
+        self.xi = xi
+
+    def drift(self, t, x):
+        return torch.stack([r * x[:, 0], torch.zeros_like(x[:, 1])], dim=1)
+
+    def diffusion(self, t, x):
+        return torch.stack([(torch.sqrt(x[:, 1]) * x[:, 0]), torch.zeros_like(x[:, 1])], dim=1)
+
+    def quadratic_parameters(self, x, h, normals):
+        a = - torch.ones_like(x) - self.kappa * h
+        b = self.xi * normals
+        c = x + self.kappa * self.theta * h - 0.5 * h * self.xi**2
+        return a, b, c
 
 
 class LogNormalJumpsSde(Sde):
