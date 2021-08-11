@@ -3,8 +3,6 @@ from .sde import *
 from .mc import *
 from .varred import *
 from .options import *
-from .regression import *
-from .approximators import *
 from .nets import *
 from .helpers import *
 from .solvers import *

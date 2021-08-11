@@ -1,5 +1,5 @@
 from sde_mc import *
-
+import torch.optim as optim
 
 device = 'cuda' if torch.cuda.is_available() else 'cpu'
 print(device)
