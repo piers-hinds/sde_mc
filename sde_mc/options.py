@@ -5,18 +5,18 @@ from scipy.stats import norm
 from abc import ABC, abstractmethod
 
 
-def aon_true(spot, strike, r, vol, time):
+def bs_binary_aon(spot, strike, expiry, r, sigma):
     """
-    Computes the true value of a binary asset-or-nothing option under GBM
+    Computes the true value of a binary asset-or-nothing option under Black-Scholes assumptions
 
     :param spot: the spot price of the asset
     :param strike: the strike price of the option
     :param r: the risk-free rate
-    :param vol: the volatility of the asset
-    :param time: the time to maturity of the option
+    :param sigma: the volatility of the asset
+    :param expiry: the time to maturity of the option
     :return: the value of the option
     """
-    upper_limit = ( np.log(spot / strike) + (r + 0.5 * vol * vol) * time ) / (np.sqrt(time) * vol)
+    upper_limit = ( np.log(spot / strike) + (r + 0.5 * sigma * sigma) * expiry ) / (np.sqrt(expiry) * sigma)
     lower_limit = -np.inf
     value_integral = quad(lambda z: np.exp(- 0.5 * z * z), lower_limit, upper_limit)[0]
     return value_integral / np.sqrt(2 * np.pi)
@@ -28,7 +28,7 @@ def bs_call(spot, strike, expiry, r, sigma):
     return spot * norm.cdf(d1) - strike * np.exp(-r * expiry) * norm.cdf(d2)
 
 
-def merton_jump_call(spot, strike, expiry, r, sigma, alpha, gamma, rate):
+def merton_call(spot, strike, expiry, r, sigma, alpha, gamma, rate):
     beta = np.exp(alpha + 0.5 * gamma * gamma) - 1
     partial_sum = 0
     for k in range(40):
@@ -37,23 +37,6 @@ def merton_jump_call(spot, strike, expiry, r, sigma, alpha, gamma, rate):
         k_fact = np.math.factorial(k)
         partial_sum += (np.exp(-(beta+1) * rate * expiry) * ((beta+1) * rate * expiry) ** k / k_fact) * \
              bs_call(spot, strike, expiry, r_k, sigma_k)
-    return partial_sum
-
-
-def merton_call(spot, strike, expiry, r, sigma, a, b, std_jump, rate):
-    partial_sum = 0
-    beta = np.exp(a + b*b/2) - 1
-    for k in range(40):
-        d1 = (np.log(spot/strike) + expiry*(r + 0.5*sigma*sigma - rate*beta) + k*(a + b*b)) / (np.sqrt(
-            sigma*sigma*expiry + k*b*b))
-
-        d2 = d1 - (sigma*sigma*expiry + k*b*b) / (np.sqrt(sigma*sigma*expiry + k*b*b))
-
-        k_fact = np.math.factorial(k)
-        moved_spot = spot * np.exp(-rate * beta * expiry + k*(a + 0.5*b*b))
-
-        partial_sum += ((rate * expiry)**k * np.exp(-rate * expiry) / k_fact) * (moved_spot*norm.cdf(d1) - strike *
-            np.exp(-r * expiry)*norm.cdf(d2))
     return partial_sum
 
 
