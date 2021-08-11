@@ -124,7 +124,7 @@ class Heston(DiffusionSde):
         self.xi = xi
 
     def drift(self, t, x):
-        return torch.stack([r * x[:, 0], torch.zeros_like(x[:, 1])], dim=1)
+        return torch.stack([self.r * x[:, 0], torch.zeros_like(x[:, 1])], dim=1)
 
     def diffusion(self, t, x):
         return torch.stack([(torch.sqrt(x[:, 1]) * x[:, 0]), torch.zeros_like(x[:, 1])], dim=1)
