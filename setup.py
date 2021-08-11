@@ -1,4 +1,5 @@
 from setuptools import setup
+from sde_mc.version import __version__
 
 setup(
     name='sde_mc',
@@ -6,8 +7,8 @@ setup(
     author='Piers Hinds',
     author_email='pmxph7@nottingham.ac.uk',
     packages=['sde_mc'],
-    install_requires=['numpy', 'torch'],
-    version='0.1',
+    install_requires=['numpy', 'torch', 'scipy'],
+    version=__version__,
     license='MIT',
     description='Monte Carlo simulation for SDEs with variance reduction methods'
 )
