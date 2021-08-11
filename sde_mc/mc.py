@@ -2,10 +2,10 @@ import time
 import numpy as np
 import torch
 from torch.utils.data import DataLoader
-from .vreduction import train_control_variates, apply_control_variates, train_diffusion_control_variate, \
+from .varred import train_control_variates, apply_control_variates, train_diffusion_control_variate, \
     apply_diffusion_control_variate
 from .nets import NormalJumpsPathData, NormalPathData
-from .block_diag import partition
+from .helpers import partition
 
 
 class MCStatistics:
