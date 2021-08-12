@@ -8,6 +8,7 @@ setup(
     author_email='pmxph7@nottingham.ac.uk',
     packages=['sde_mc'],
     install_requires=['numpy', 'torch', 'scipy'],
+    tests_require=['pytest'],
     version=__version__,
     license='MIT',
     description='Monte Carlo simulation for SDEs with variance reduction methods'
