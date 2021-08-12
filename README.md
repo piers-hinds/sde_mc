@@ -1,3 +1,3 @@
-![Build Status](https://github.com/<OWNER>/<REPOSITORY>/workflows/<WORKFLOW_NAME>/badge.svg)
+![Pytest Status](https://github.com/Piers14/sde_mc/workflows/Pytesting/badge.svg)
 # sde_mc
  Monte Carlo simulation for SDEs with variance reduction methods
