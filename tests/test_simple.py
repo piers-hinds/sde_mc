@@ -115,8 +115,8 @@ def test_mc_simple():
     gbm = Gbm(0.02, 0.2, torch.tensor([1.]), dim=1)
     solver = SdeSolver(gbm, 3, 10)
     mc_stats = mc_simple(100, solver, EuroCall(1), ConstantShortRate(0.02)(solver.time))
-    assert mc_stats.time_elapsed > 0
-    assert mc_stats.sample_mean > 0
+    assert mc_stats.time_elapsed >= 0
+    assert mc_stats.sample_mean >= 0
     assert mc_stats.sample_std > 0
     assert not mc_stats.payoffs.isnan().any()
     assert mc_stats.paths.shape == (100, 11, 1)
