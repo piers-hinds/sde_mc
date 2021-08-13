@@ -5,7 +5,7 @@ from torch.utils.data import DataLoader
 from .varred import train_control_variates, apply_control_variates, train_diffusion_control_variate, \
     apply_diffusion_control_variate
 from .nets import NormalJumpsPathData, NormalPathData
-from .helpers import partition
+from .helpers import partition, mc_estimates
 
 
 class MCStatistics:
@@ -107,13 +107,15 @@ def mc_simple(num_trials, sde_solver, payoff, discount=1, bs=None, return_normal
         return MCStatistics(mn, sd, tt)
 
 
-def mc_control_variates(models, opt, solver, trials, steps, payoff, discounter, bs=(1000, 1000), epochs=10):
+def mc_control_variates(models, opt, solver, trials, steps, payoff, discounter, sim_bs=(100000, 100000),
+                        bs=(1000, 1000), epochs=10):
     # Config
     jump_mean = solver.sde.jump_mean()
     rate = solver.sde.jump_rate()
     train_trials, test_trials = trials
     train_steps, test_steps = steps
     train_bs, test_bs = bs
+    train_sim_bs, test_sim_bs = sim_bs
     solver.num_steps = train_steps
 
     train_time_points = partition(solver.time, train_steps, ends='left', device=solver.device)
@@ -121,28 +123,39 @@ def mc_control_variates(models, opt, solver, trials, steps, payoff, discounter, 
     train_ys, test_ys = discounter(train_time_points), discounter(test_time_points)
 
     # Training
-    train_dataloader, train_sim_time = simulate_data(train_trials, solver, payoff, discounter, bs=train_bs)
+    train_start = time.time()
+    train_dataloader = simulate_data(train_trials, solver, payoff, discounter, bs=train_bs)
     if solver.has_jumps:
-        training_time, losses = train_control_variates(models, opt, train_dataloader, jump_mean, rate, train_time_points,
-                                                       train_ys, epochs)
+        _, losses = train_control_variates(models, opt, train_dataloader, jump_mean, rate, train_time_points,
+                                           train_ys, epochs)
     else:
-        training_time, losses = train_diffusion_control_variate(models, opt, train_dataloader, train_time_points,
-                                                                train_ys, epochs)
+        _, losses = train_diffusion_control_variate(models, opt, train_dataloader, train_time_points, train_ys, epochs)
+    train_end = time.time()
+    train_time = train_end - train_start
 
     # Inference
+    start_test = time.time()
     solver.num_steps = test_steps
-    test_dataloader, test_sim_time = simulate_data(test_trials, solver, payoff, discounter, bs=test_bs, inference=True)
-    if solver.has_jumps:
-        mn, sd, inference_time, _ = apply_control_variates(models, test_dataloader, jump_mean, rate, test_time_points,
-                                                           test_ys)
-    else:
-        mn, sd, inference_time, _ = apply_diffusion_control_variate(models, test_dataloader, test_time_points, test_ys)
+    run_sum, run_sum_sq = 0, 0
+    trials_remaining = test_trials
+    while trials_remaining > 0:
+        batch_size = min(test_sim_bs, trials_remaining)
+        trials_remaining -= batch_size
+        test_dataloader = simulate_data(batch_size, solver, payoff, discounter, bs=test_bs, inference=True)
+        if solver.has_jumps:
+            x, y = apply_control_variates(models, test_dataloader, jump_mean, rate, test_time_points, test_ys)
+        else:
+            x, y = apply_diffusion_control_variate(models, test_dataloader, test_time_points, test_ys)
+        run_sum += x
+        run_sum_sq += y
 
-    return MCStatistics(mn, sd, train_sim_time+training_time+test_sim_time+inference_time)
+    mn, sd = mc_estimates(run_sum, run_sum_sq, test_trials)
+    end_test = time.time()
+    test_time = end_test - start_test
+    return MCStatistics(mn, sd, train_time+test_time)
 
 
 def simulate_data(trials, solver, payoff, discounter, bs=1000, inference=False):
-    start = time.time()
     if inference:
         assert not trials % bs, 'Batch size should partition total trials evenly'
     mc_stats = mc_simple(trials, solver, payoff, discounter(solver.time), return_normals=True)
@@ -154,5 +167,4 @@ def simulate_data(trials, solver, payoff, discounter, bs=1000, inference=False):
         paths, (_, normals, _) = mc_stats.paths, mc_stats.normals
         payoffs = mc_stats.payoffs
         dset = NormalPathData(paths, payoffs, normals.squeeze(-1))
-    end = time.time()
-    return DataLoader(dset, batch_size=bs, shuffle=not inference, drop_last=not inference), end-start
+    return DataLoader(dset, batch_size=bs, shuffle=not inference, drop_last=not inference)
