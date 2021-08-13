@@ -149,7 +149,8 @@ def mc_control_variates(models, opt, solver, trials, steps, payoff, discounter, 
         run_sum += x
         run_sum_sq += y
 
-    mn, sd = mc_estimates(run_sum, run_sum_sq, test_trials)
+    mn, var = mc_estimates(run_sum, run_sum_sq, test_trials)
+    sd = var.sqrt() / torch.tensor(test_trials).sqrt()
     end_test = time.time()
     test_time = end_test - start_test
     return MCStatistics(mn, sd, train_time+test_time)

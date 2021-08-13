@@ -23,7 +23,7 @@ def solve_quadratic(coefficients):
 
 
 def mc_estimates(run_sum, run_sum_sq, n):
-    """Returns sample mean and MC error from sum and sum of squares"""
+    """Returns sample mean and variance from sum and sum of squares"""
     sample_mean = run_sum / n
-    sample_std = torch.sqrt(((run_sum_sq - (run_sum * run_sum) / n) / (n - 1)))
-    return sample_mean, sample_std / torch.sqrt(torch.tensor(n))
+    sample_var = ((run_sum_sq - (run_sum * run_sum) / n) / (n - 1))
+    return sample_mean, sample_var

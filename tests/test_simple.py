@@ -105,7 +105,7 @@ def test_quadratic_solver():
 def test_mc_estimates():
     sample = torch.tensor([1, 2, 3, 4, 5, 20, 100.])
     run_sum, run_sum_sq, n = sample.sum(), (sample*sample).sum(), len(sample)
-    expected = (sample.mean(), sample.std() / torch.sqrt(torch.tensor(n)))
+    expected = (sample.mean(), sample.var())
     result = mc_estimates(run_sum, run_sum_sq, n)
     assert torch.isclose(result[0], expected[0])
     assert torch.isclose(result[1], expected[1])
