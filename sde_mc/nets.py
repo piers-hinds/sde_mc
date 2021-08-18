@@ -10,14 +10,19 @@ class Mlp(nn.Module):
         super(Mlp, self).__init__()
         self.num_layers = len(layer_sizes)
         layers = []
+
         if batch_norm_init:
             layers += [nn.BatchNorm1d(input_size)]
-        layers += [nn.Linear(input_size, layer_sizes[0]), nn.BatchNorm1d(layer_sizes[0]), activation()]
+        layers += [nn.Linear(input_size, layer_sizes[0])]
+        if batch_norm:
+            layers += [nn.BatchNorm1d(layer_sizes[0])]
+        layers += [activation()]
 
         for i in range(self.num_layers-1):
-            layers += [nn.Linear(layer_sizes[i], layer_sizes[i+1]), activation()]
+            layers += [nn.Linear(layer_sizes[i], layer_sizes[i+1])]
             if batch_norm:
                 layers += [nn.BatchNorm1d(layer_sizes[i+1])]
+            layers += [activation()]
         layers += [nn.Linear(layer_sizes[self.num_layers-1], output_size)]
         if final_activation is not None:
             layers += [final_activation()]
