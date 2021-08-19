@@ -101,6 +101,16 @@ class Rainbow(Option):
                                                                                 device=spot.device))
 
 
+class Digital(Option):
+    def __init__(self, strike, log=False):
+        super(Digital, self).__init__(log)
+        self.strike = strike
+
+    def __call__(self, x):
+        spot = torch.exp(x[:, 0]) if self.log else x[:, 0]
+        return torch.where(spot > self.strike, torch.ones_like(spot), torch.zeros_like(spot))
+
+
 class HestonRainbow(Option):
     def __init__(self, strike, log=False):
         super(HestonRainbow, self).__init__(log)
