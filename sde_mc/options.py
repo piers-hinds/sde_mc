@@ -1,7 +1,7 @@
 import numpy as np
 import torch
 from scipy.integrate import quad
-from scipy.stats import norm
+from scipy.stats import norm, lognorm
 from abc import ABC, abstractmethod
 
 
@@ -38,6 +38,11 @@ def merton_call(spot, strike, expiry, r, sigma, alpha, gamma, rate):
         partial_sum += (np.exp(-(beta+1) * rate * expiry) * ((beta+1) * rate * expiry) ** k / k_fact) * \
              bs_call(spot, strike, expiry, r_k, sigma_k)
     return partial_sum
+
+
+def bs_digital_call(spot, strike, maturity, r, sigma):
+    return spot * (1 - lognorm.cdf(strike, s=sigma * np.sqrt(maturity), loc=r * maturity - 0.5 * sigma * \
+        sigma * maturity)) * np.exp(-r * maturity)
 
 
 class Option(ABC):
