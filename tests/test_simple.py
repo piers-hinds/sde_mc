@@ -204,13 +204,17 @@ def test_solvers_merton(merton_1d_solver):
     assert torch.allclose(all_jumps * left_paths + left_paths, paths)
 
 
+def test_multilevel_euler(gbm_1d_solver):
+    levels = [4, 8]
+    (paths_fine, paths_coarse), norms = gbm_1d_solver.multilevel_euler(bs=4, levels=levels, return_normals=True)
+
+
 # varred.py
 def test_apply_dcv(mlps_1d, sample_dataloader):
     trials, steps, dim = sample_dataloader.dataset.paths.shape
     time_points = partition(3, steps, ends='left')
     ys = time_points
     run_sum, run_sum_sq = apply_diffusion_control_variate(mlps_1d[0], sample_dataloader, time_points, ys)
-    assert run_sum >= 0
     assert run_sum_sq >= 0
 
 

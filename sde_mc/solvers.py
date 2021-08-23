@@ -113,4 +113,29 @@ class SdeSolver:
                 t += h
         return paths, (None, corr_normals, None)
 
+    def multilevel_euler(self, bs, levels, return_normals=False):
+        bs = int(bs)
+        fine, coarse = levels
+        factor = int(fine / coarse)
 
+        h = torch.tensor(self.time / fine, device=self.device)
+        paths_fine = torch.empty(size=(bs, fine + 1, self.sde.dim), device=self.device)
+        paths_coarse = torch.empty(size=(bs, coarse + 1, self.sde.dim), device=self.device)
+        paths_fine[:, 0] = self.sde.init_value.unsqueeze(0).repeat(bs, 1).to(self.device)
+        paths_coarse[:, 0] = self.sde.init_value.unsqueeze(0).repeat(bs, 1).to(self.device)
+
+        corr_normals = self.sample_corr_normals((bs, fine, self.sde.dim, 1), h=h).squeeze(-1)
+        t = torch.tensor(0.0, device=self.device)
+
+        for i in range(coarse):
+            for j in range(factor):
+                # step the fine approximation
+                paths_fine[:, i * factor + j + 1] = paths_fine[:, i * factor + j] + \
+                                                    self.sde.drift(t, paths_fine[:, i * factor + j]) * h + \
+                                                    self.sde.diffusion(t, paths_fine[:, i * factor + j]) * \
+                                                    corr_normals[:, i * factor + j]
+            # step the coarse approximation
+            paths_coarse[:, i + 1] = paths_coarse[:, i] + self.sde.drift(t, paths_coarse[:, i]) * h * factor + \
+                                     self.sde.diffusion(t, paths_coarse[:, i]) * torch.sum(
+                corr_normals[:, (i * factor):((i + 1) * factor)], dim=1)
+        return (paths_fine, paths_coarse), (None, corr_normals, None)
