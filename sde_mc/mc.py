@@ -35,15 +35,11 @@ class MCStatistics:
         self.payoffs = payoffs
         self.normals = normals
 
-    def print(self, num_std=2):
-        """Prints the mean, confidence interval, and time taken
-
-        :param num_std: float
-            The coefficient corresponding to fiducial probabilities - e.g. num_std = 2
-            corresponds to a 95% confidence interval
+    def __str__(self):
+        """Prints the mean, 95% confidence interval, and time taken
         """
-        print('Mean: {:.5f}  +/- {:.5f}     Time taken (s): {:.2f}'.format(self.sample_mean, self.sample_std * num_std,
-                                                                           self.time_elapsed))
+        return 'Mean: {:.6f}  +/- {:.6f}     Time taken (s): {:.2f}'.format(self.sample_mean, self.sample_std * 2,
+                                                                            self.time_elapsed)
 
 
 def mc_simple(num_trials, sde_solver, payoff, discount=1, bs=None, return_normals=False):
