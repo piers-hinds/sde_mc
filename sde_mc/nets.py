@@ -4,8 +4,32 @@ from torch.utils.data import Dataset
 
 
 class Mlp(nn.Module):
-    def __init__(self, input_size, layer_sizes, output_size, activation=nn.Tanh, final_activation=None,
+    """Multilayer perceptron (MLP)"""
+
+    def __init__(self, input_size, layer_sizes, output_size, activation=nn.ReLU, final_activation=None,
                  batch_norm=True, batch_norm_init=True):
+        """
+        :param input_size: int
+            Input dimensions
+
+        :param layer_sizes: list of ints
+            The sizes of the hidden layers
+
+        :param output_size: int
+            Output dimension
+
+        :param activation: nn.Module (default = nn.ReLU)
+            The activation function used after each linear layer
+
+        :param final_activation: nn.Module (default = None)
+            The final activation function
+
+        :param batch_norm: bool (default = True)
+            If True, uses a batch norma layer before each activation
+
+        :param batch_norm_init: bool (default = True)
+            It True, uses a batch norm layer on the inputs
+        """
         assert len(layer_sizes) > 0, "At least one hidden layer required."
         super(Mlp, self).__init__()
         self.num_layers = len(layer_sizes)
