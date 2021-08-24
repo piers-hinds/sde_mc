@@ -235,6 +235,10 @@ def test_mc_multilevel(gbm_1d_solver):
     assert mc_stats.sample_std > 0
 
 
+def test_get_optimal_trials(gbm_1d_solver):
+    opt_trials = get_optimal_trials(100, [1, 4, 16], 0.001, gbm_1d_solver, EuroCall(1), ConstantShortRate(0.02))
+    assert len(opt_trials) == 3
+
 
 
 

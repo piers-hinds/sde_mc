@@ -221,7 +221,7 @@ def get_optimal_trials(trials, levels, epsilon, solver, payoff, discounter):
     vars[0] = var
 
     for i, pair in enumerate(pairs):
-        paths_fine, paths_coarse = solver.double_euler(trials, pair)
+        (paths_fine, paths_coarse), _ = solver.multilevel_euler(trials, pair)
         terminals = discounter(solver.time) * (payoff(paths_fine[:, pair[0]]) - payoff(paths_coarse[:, pair[1]]))
         vars[i + 1] = terminals.var()
 
