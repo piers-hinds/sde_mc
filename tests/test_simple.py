@@ -228,7 +228,11 @@ def test_mc_simple(gbm_2d_solver):
     assert mc_stats.paths.shape == (100, 11, 2)
 
 
-
+def test_mc_multilevel(gbm_1d_solver):
+    mc_stats = mc_multilevel([50, 20, 10], [1, 4, 16], gbm_1d_solver, EuroCall(1), ConstantShortRate(0.02))
+    assert mc_stats.time_elapsed >= 0
+    assert mc_stats.sample_mean >= 0
+    assert mc_stats.sample_std > 0
 
 
 

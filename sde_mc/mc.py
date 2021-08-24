@@ -182,7 +182,7 @@ def mc_multilevel(trials, levels, solver, payoff, discounter, bs=None):
         trials_remaining = trials[i + 1]
         while trials_remaining > 0:
             next_batch_size = min(trials_remaining, bs[i + 1])
-            paths_fine, paths_coarse = solver.double_euler(next_batch_size, pair)
+            (paths_fine, paths_coarse), _ = solver.multilevel_euler(next_batch_size, pair)
             terminals = discounter(solver.time) * (payoff(paths_fine[:, pair[0]]) - payoff(paths_coarse[:, pair[1]]))
             run_sum += terminals.sum()
             run_sum_sq += (terminals * terminals).sum()
@@ -192,7 +192,7 @@ def mc_multilevel(trials, levels, solver, payoff, discounter, bs=None):
     total_sd = (vars / trial_numbers).sum().sqrt()
     total_mean = exps.sum()
     end = time.time()
-    return MCStatistics(total_mean, total_sd, end - start), (exps, vars)
+    return MCStatistics(total_mean, total_sd, end - start)
 
 
 def simulate_data(trials, solver, payoff, discounter, bs=1000, inference=False):
