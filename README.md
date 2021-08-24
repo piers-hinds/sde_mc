@@ -4,6 +4,7 @@
 # sde_mc
  Monte Carlo simulation for SDEs with variance reduction methods
 
-![GBM](https://github.com/Piers14/sde_mc/viz/gbm_paths.gif)
-
-
+---
+<p align="center">
+  <img width="600" height="400" src="./viz/gbm_paths.gif">
+</p>
