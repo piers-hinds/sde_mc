@@ -271,11 +271,11 @@ def simulate_data(trials, solver, payoff, discounter, bs=1000, inference=False):
     if solver.has_jumps:
         paths, (paths_no_jumps, normals, jumps) = mc_stats.paths, mc_stats.normals
         payoffs = mc_stats.payoffs
-        dset = NormalJumpsPathData(paths, paths_no_jumps, payoffs, normals.squeeze(-1), jumps)
+        dset = NormalJumpsPathData(paths, paths_no_jumps, payoffs, normals, jumps)
     else:
         paths, (_, normals, _) = mc_stats.paths, mc_stats.normals
         payoffs = mc_stats.payoffs
-        dset = NormalPathData(paths, payoffs, normals.squeeze(-1))
+        dset = NormalPathData(paths, payoffs, normals)
     return DataLoader(dset, batch_size=bs, shuffle=not inference, drop_last=not inference)
 
 

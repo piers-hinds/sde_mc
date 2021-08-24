@@ -35,7 +35,7 @@ class SdeSolver:
     
     def sample_corr_normals(self, size, h):
         normals = torch.randn(size=size, device=self.device) * torch.sqrt(h)
-        return torch.matmul(self.lower_cholesky, normals)
+        return torch.matmul(self.lower_cholesky, normals).squeeze(-1)
 
     def sample_poissons(self, size, h):
         rates = torch.ones(size=size, device=self.device) * (self.sde.rate * h)
@@ -73,14 +73,14 @@ class SdeSolver:
 
             for i in range(self.num_steps):
                 paths_no_jumps[:, i + 1] = paths[:, i] + self.sde.drift(t, paths[:, i]) * h + \
-                                           self.sde.diffusion(t, paths[:, i]) * corr_normals[:, i].squeeze(-1)
+                                           self.sde.diffusion(t, paths[:, i]) * corr_normals[:, i]
                 paths[:, i + 1] = paths_no_jumps[:, i + 1] * (jumps[:, i] + 1)
                 t += h
             additional_data = (paths_no_jumps, corr_normals, jumps)
         else:
             for i in range(self.num_steps):
                 paths[:, i + 1] = paths[:, i] + self.sde.drift(t, paths[:, i]) * h + \
-                                  self.sde.diffusion(t, paths[:, i]) * corr_normals[:, i].squeeze(-1)
+                                  self.sde.diffusion(t, paths[:, i]) * corr_normals[:, i]
                 t += h
             additional_data = (None, corr_normals, None)
 
@@ -90,7 +90,7 @@ class SdeSolver:
             return paths, None
         
     def heston(self, bs=1, return_normals=False):
-        """Custom scheme specifically for the Heston model. The asset price is simualted by the explicit 
+        """Custom scheme specifically for the Heston model. The asset price is simulated by the explicit
         Euler scheme, while the variance is simulated using the fully implicit Euler scheme to preserve 
         positivity."""
         assert bs >= 1, "Batch size must at least one"
@@ -108,8 +108,8 @@ class SdeSolver:
 
         for i in range(self.num_steps):
                 paths[:, i + 1] = paths[:, i] + self.sde.drift(t, paths[:, i]) * h + \
-                                  self.sde.diffusion(t, paths[:, i]) * corr_normals[:, i].squeeze(-1)
-                coefs = self.sde.quadratic_parameters(paths[:, i, 1], h, corr_normals[:, i, 1].squeeze(-1))
+                                  self.sde.diffusion(t, paths[:, i]) * corr_normals[:, i]
+                coefs = self.sde.quadratic_parameters(paths[:, i, 1], h, corr_normals[:, i, 1])
                 sol = solve_quadratic(coefs)
                 paths[:, i + 1, 1] = sol * sol
                 t += h
@@ -126,7 +126,7 @@ class SdeSolver:
         paths_fine[:, 0] = self.sde.init_value.unsqueeze(0).repeat(bs, 1).to(self.device)
         paths_coarse[:, 0] = self.sde.init_value.unsqueeze(0).repeat(bs, 1).to(self.device)
 
-        corr_normals = self.sample_corr_normals((bs, fine, self.sde.dim, 1), h=h).squeeze(-1)
+        corr_normals = self.sample_corr_normals((bs, fine, self.sde.dim, 1), h=h)
         t = torch.tensor(0.0, device=self.device)
 
         for i in range(coarse):
