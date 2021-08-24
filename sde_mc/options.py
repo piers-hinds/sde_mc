@@ -6,29 +6,88 @@ from abc import ABC, abstractmethod
 
 
 def bs_binary_aon(spot, strike, expiry, r, sigma):
-    """
-    Computes the true value of a binary asset-or-nothing option under Black-Scholes assumptions
+    """Computes the true value of a binary asset-or-nothing option under Black-Scholes assumptions
 
-    :param spot: the spot price of the asset
-    :param strike: the strike price of the option
-    :param r: the risk-free rate
-    :param sigma: the volatility of the asset
-    :param expiry: the time to maturity of the option
-    :return: the value of the option
+    :param spot: float
+        The spot price of the asset
+
+    :param strike: float
+        The strike price of the option
+
+    :param expiry: float
+        The time to maturity of the option
+
+    :param r: float
+        The risk-free rate
+
+    :param sigma: float
+        The volatility of the asset
+
+    :return: float
+        The value of the option
     """
-    upper_limit = ( np.log(spot / strike) + (r + 0.5 * sigma * sigma) * expiry ) / (np.sqrt(expiry) * sigma)
+    upper_limit = (np.log(spot / strike) + (r + 0.5 * sigma * sigma) * expiry) / (np.sqrt(expiry) * sigma)
     lower_limit = -np.inf
     value_integral = quad(lambda z: np.exp(- 0.5 * z * z), lower_limit, upper_limit)[0]
     return value_integral / np.sqrt(2 * np.pi)
 
 
 def bs_call(spot, strike, expiry, r, sigma):
+    """ Computes the true value of a European call option under Black-Scholes assumptions
+
+    :param spot: float
+        The spot price of the asset
+
+    :param strike: float
+        The strike price of the option
+
+    :param expiry: float
+        The time to maturity of the option
+
+    :param r: float
+        The risk-free rate
+
+    :param sigma: float
+        The volatility of the asset
+
+    :return: float
+        The value of the option
+    """
     d1 = (np.log(spot / strike) + (r + sigma ** 2 / 2) * expiry) / (sigma * np.sqrt(expiry))
     d2 = d1 - sigma * np.sqrt(expiry)
     return spot * norm.cdf(d1) - strike * np.exp(-r * expiry) * norm.cdf(d2)
 
 
 def merton_call(spot, strike, expiry, r, sigma, alpha, gamma, rate):
+    """Computes the true value of a European call option under the Merton jump-diffusion model
+
+    :param spot: float
+        The spot price of the asset
+
+    :param strike: float
+        The strike price of the option
+
+    :param expiry: float
+        The time to maturity of the option
+
+    :param r: float
+        The risk-free rate
+
+    :param sigma: float
+        The volatility of the asset
+
+    :param alpha: float
+        The mean of the log-jumps
+
+    :param gamma: float
+        The standard deviation of the log-jumps
+
+    :param rate: float
+        The intensity of the jumps
+
+    :return: float
+        The value of the option
+    """
     beta = np.exp(alpha + 0.5 * gamma * gamma) - 1
     partial_sum = 0
     for k in range(40):
@@ -40,14 +99,39 @@ def merton_call(spot, strike, expiry, r, sigma, alpha, gamma, rate):
     return partial_sum
 
 
-def bs_digital_call(spot, strike, maturity, r, sigma):
-    return spot * (1 - lognorm.cdf(strike, s=sigma * np.sqrt(maturity), loc=r * maturity - 0.5 * sigma * \
-        sigma * maturity)) * np.exp(-r * maturity)
+def bs_digital_call(spot, strike, expiry, r, sigma):
+    """Computes the true value of a digital option under Black-Scholes assumptions
+
+    :param spot: float
+        The spot price of the asset
+
+    :param strike: float
+        The strike price of the option
+
+    :param expiry: float
+        The time to maturity of the option
+
+    :param r: float
+        The risk-free rate
+
+    :param sigma: float
+        The volatility of the asset
+
+    :return: float
+        The value of the option
+    """
+    return spot * (1 - lognorm.cdf(strike, s=sigma * np.sqrt(expiry), loc=r * expiry - 0.5 * sigma * \
+        sigma * expiry)) * np.exp(-r * expiry)
 
 
 class Option(ABC):
     """Abstract base class for options"""
+
     def __init__(self, log=False):
+        """
+        :param log: bool
+            If true, takes exponential of terminal value before applying payoff
+        """
         self.log = log
 
     @abstractmethod
@@ -59,6 +143,13 @@ class EuroCall(Option):
     """European call option"""
 
     def __init__(self, strike, log=False):
+        """
+        :param strike: float,
+            The strike price of the option
+
+        :param log: bool
+            If true, takes exponential of terminal value before applying payoff
+        """
         super(EuroCall, self).__init__(log)
         self.strike = strike
 
@@ -81,6 +172,8 @@ class BinaryAoN(Option):
 
 
 class Basket(Option):
+    """Basket option"""
+
     def __init__(self, strike, average_type='arithmetic', log=False):
         assert average_type in ['arithmetic', 'geometric']
         super(Basket, self).__init__(log)
@@ -95,6 +188,8 @@ class Basket(Option):
 
 
 class Rainbow(Option):
+    """Rainbow option (call on max)"""
+
     def __init__(self, strike, log=False):
         super(Rainbow, self).__init__(log)
         self.strike = strike
@@ -107,6 +202,8 @@ class Rainbow(Option):
 
 
 class Digital(Option):
+    """Digital option"""
+
     def __init__(self, strike, log=False):
         super(Digital, self).__init__(log)
         self.strike = strike
@@ -131,7 +228,13 @@ class HestonRainbow(Option):
 
 
 class ConstantShortRate:
+    """Constant short rate discounter"""
+
     def __init__(self, r):
+        """
+        :param r: float,
+            the risk-free rate
+        """
         self.r = r
 
     def __call__(self, t):
