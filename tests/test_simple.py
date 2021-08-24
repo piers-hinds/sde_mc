@@ -220,7 +220,7 @@ def test_apply_dcv(mlps_1d, sample_dataloader):
 
 # mc.py
 def test_mc_simple(gbm_2d_solver):
-    mc_stats = mc_simple(100, gbm_2d_solver, EuroCall(1), ConstantShortRate(0.02)(gbm_2d_solver.time))
+    mc_stats = mc_simple(100, gbm_2d_solver, EuroCall(1), ConstantShortRate(0.02))
     assert mc_stats.time_elapsed >= 0
     assert mc_stats.sample_mean >= 0
     assert mc_stats.sample_std > 0

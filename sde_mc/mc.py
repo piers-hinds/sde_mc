@@ -6,6 +6,7 @@ from .varred import train_control_variates, apply_control_variates, train_diffus
     apply_diffusion_control_variate
 from .nets import NormalJumpsPathData, NormalPathData
 from .helpers import partition, mc_estimates
+from .options import ConstantShortRate
 
 
 class MCStatistics:
@@ -42,8 +43,8 @@ class MCStatistics:
                                                                             self.time_elapsed)
 
 
-def mc_simple(num_trials, sde_solver, payoff, discount=1, bs=None, return_normals=False):
-    """Run Monte Carlo simulations of an SDE
+def mc_simple(num_trials, sde_solver, payoff, discounter=None, bs=None, return_normals=False):
+    """Run Monte Carlo simulations of a functional of an SDE's terminal value
 
     :param num_trials: int
         The number of MC simulations
@@ -54,25 +55,27 @@ def mc_simple(num_trials, sde_solver, payoff, discount=1, bs=None, return_normal
     :param payoff: Option
         The payoff function applied to the terminal value - see the Option class
 
-    :param discount: float, default = 1
-        A discount factor to be applied to the payoffs
+    :param discounter: callable function of time (default = None)
+        A function which returns the discount factor to be applied to the payoffs
 
-    :param bs: int, default = None
-        The batch size. When None all trials will be done simultaneously. When a bs is specified the payoffs
+    :param bs: int (default = None)
+        The batch size. When None all trials will be done simultaneously. When a batch size is specified the payoffs
         and paths will not be recorded
 
-    :param return_normals: bool, default = False
-        If True, passes return_normals to the Euler method of the SDE solver. Returns the normal random variables
-        used in the numerical integration
+    :param return_normals: bool (default = False)
+        If True returns the normal random variables used in the numerical integration
 
     :return: MCStatistics
         The relevant statistics from the MC simulation - see the MCStatistics class
     """
+    if discounter is None:
+        discounter = ConstantShortRate(r=0.0)
+
     if not bs:
         start = time.time()
         out, normals = sde_solver.solve(bs=num_trials, return_normals=return_normals)
         spots = out[:, sde_solver.num_steps]
-        payoffs = payoff(spots) * discount
+        payoffs = payoff(spots) * discounter(sde_solver.time_interval)
 
         mn = payoffs.mean()
         sd = payoffs.std() / np.sqrt(num_trials)
@@ -91,7 +94,7 @@ def mc_simple(num_trials, sde_solver, payoff, discount=1, bs=None, return_normal
             remaining_trials -= bs
             out, normals = sde_solver.solve(bs=bs, return_normals=False)
             spots = out[:, sde_solver.num_steps]
-            payoffs = payoff(spots) * discount
+            payoffs = payoff(spots) * discounter(sde_solver.time_interval)
 
             sample_sum += payoffs.sum()
             sample_sum_sq += (payoffs**2).sum()
@@ -103,8 +106,47 @@ def mc_simple(num_trials, sde_solver, payoff, discount=1, bs=None, return_normal
         return MCStatistics(mn, sd, tt)
 
 
-def mc_control_variates(models, opt, solver, trials, steps, payoff, discounter, sim_bs=(100000, 100000),
+def mc_control_variates(models, opt, solver, trials, steps, payoff, discounter, sim_bs=(1e5, 1e5),
                         bs=(1000, 1000), epochs=10):
+    """Monte Carlo simulation of a functional of an SDE's terminal value with neural control variates
+
+    Generates initial trajectories and payoffs on which regression is performed to find optimal control variates (a
+    coarser time grid can be used). Then the control variates can be used on newly generated trajectories to
+    significantly reduce variance.
+
+    :param models: list of nn.Module
+        The neural networks used to approximate the control variates for the brownian motion and the Poisson process
+
+    :param opt: optimizer
+        Optimizer from torch.optim used to step the parameters in models
+
+    :param solver: SdeSolver
+        The solver for the SDE
+
+    :param trials: (int, int)
+        Trials for the initial coarser simulation (training) and for the finer simulation (inference)
+
+    :param steps: (int, int)
+         Number of steps for the initial coarser simulation (training) and for the finer simulation (inference)
+
+    :param payoff: Option
+        The payoff function to be applied to the terminal value of the simulated SDE
+
+    :param discounter: Callable function of time
+        The discount function which returns the discount to be applied to the payoffs
+
+    :param sim_bs: (int, int) (default = (1e5, 1e5))
+        The batch sizes to simulate the trajectories (fine and coarse, respectively)
+
+    :param bs: (int, int) (default = (1e3, 1e3))
+        The batch sizes for training and inference, respectively
+
+    :param epochs: int (default = 10)
+        Number of epochs in training
+
+    :return: MCStatistics
+        The relevant MC statistics
+    """
     # Config
     jump_mean = solver.sde.jump_mean()
     rate = solver.sde.jump_rate()
@@ -153,6 +195,30 @@ def mc_control_variates(models, opt, solver, trials, steps, payoff, discounter, 
 
 
 def mc_multilevel(trials, levels, solver, payoff, discounter, bs=None):
+    """Runs a multilevel Monte Carlo simulation of a functional of the terminal value of an SDE
+
+    :param trials: list of ints
+        The number of trials for each level
+
+    :param levels: list of ints
+        The number of steps for each level which should be increasing and levels[i] should divide levels[i+1]
+
+    :param solver: SdeSolver
+        The solver for an SDE
+
+    :param payoff: Option
+        The payoff function to be applied to the terminal values of the trajectories
+
+    :param discounter: Callable function of time
+        The discount function which returns a discount to be applied to the payoffs
+
+    :param bs: list of ints (default = None)
+        The batch sizes for each level
+
+    :return: MCStatistics
+        The relevant Monte Carlo statistics
+    """
+
     if bs is None:
         bs = trials
     start = time.time()
@@ -168,7 +234,7 @@ def mc_multilevel(trials, levels, solver, payoff, discounter, bs=None):
         next_batch_size = min(trials_remaining, bs[0])
         solver.num_steps = levels[0]
         paths, _ = solver.solve(bs=next_batch_size)
-        terminals = payoff(paths[:, solver.num_steps, :]) * discounter(solver.time)
+        terminals = payoff(paths[:, solver.num_steps, :]) * discounter(solver.time_interval)
         run_sum += terminals.sum()
         run_sum_sq += (terminals * terminals).sum()
         trials_remaining -= next_batch_size
@@ -183,7 +249,7 @@ def mc_multilevel(trials, levels, solver, payoff, discounter, bs=None):
         while trials_remaining > 0:
             next_batch_size = min(trials_remaining, bs[i + 1])
             (paths_fine, paths_coarse), _ = solver.multilevel_euler(next_batch_size, pair)
-            terminals = discounter(solver.time) * (payoff(paths_fine[:, pair[0]]) - payoff(paths_coarse[:, pair[1]]))
+            terminals = discounter(solver.time_interval) * (payoff(paths_fine[:, pair[0]]) - payoff(paths_coarse[:, pair[1]]))
             run_sum += terminals.sum()
             run_sum_sq += (terminals * terminals).sum()
             trials_remaining -= next_batch_size
@@ -196,9 +262,12 @@ def mc_multilevel(trials, levels, solver, payoff, discounter, bs=None):
 
 
 def simulate_data(trials, solver, payoff, discounter, bs=1000, inference=False):
+    """Simulates trajectories of an SDE and returns the trajectories, payoffs and random variables in a DataLoader
+    which can be used for training or inference"""
+
     if inference:
         assert not trials % bs, 'Batch size should partition total trials evenly'
-    mc_stats = mc_simple(trials, solver, payoff, discounter(solver.time), return_normals=True)
+    mc_stats = mc_simple(trials, solver, payoff, discounter, return_normals=True)
     if solver.has_jumps:
         paths, (paths_no_jumps, normals, jumps) = mc_stats.paths, mc_stats.normals
         payoffs = mc_stats.payoffs
@@ -211,18 +280,20 @@ def simulate_data(trials, solver, payoff, discounter, bs=1000, inference=False):
 
 
 def get_optimal_trials(trials, levels, epsilon, solver, payoff, discounter):
+    """Finds the optimal number of trials at each level for the MLMC method (for a given tolerence)"""
+
     vars = torch.zeros(len(levels))
     pairs = [(levels[i + 1], levels[i]) for i in range(0, len(levels) - 1)]
-    step_sizes = solver.time / torch.tensor(levels)
+    step_sizes = solver.time_interval / torch.tensor(levels)
     solver.num_steps = levels[0]
     paths, _ = solver.solve(bs=trials)
-    discounted_payoffs = payoff(paths[:, solver.num_steps, :]) * discounter(solver.time)
+    discounted_payoffs = payoff(paths[:, solver.num_steps, :]) * discounter(solver.time_interval)
     var = discounted_payoffs.var()
     vars[0] = var
 
     for i, pair in enumerate(pairs):
         (paths_fine, paths_coarse), _ = solver.multilevel_euler(trials, pair)
-        terminals = discounter(solver.time) * (payoff(paths_fine[:, pair[0]]) - payoff(paths_coarse[:, pair[1]]))
+        terminals = discounter(solver.time_interval) * (payoff(paths_fine[:, pair[0]]) - payoff(paths_coarse[:, pair[1]]))
         vars[i + 1] = terminals.var()
 
     sum_term = (vars / step_sizes).sqrt().sum()

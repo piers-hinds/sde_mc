@@ -3,16 +3,18 @@ from .helpers import solve_quadratic
 
 
 class SdeSolver:
-    def __init__(self, sde, time, num_steps, device='cpu', seed=1):
+    """A class for generating trajectories of SDEs: contains an SDE object and information about the numerical scheme"""
+
+    def __init__(self, sde, time_interval, num_steps, device='cpu', seed=1):
         """
         :param sde: Sde, the SDE to solve
-        :param time: float, the time to solve up to
+        :param time_interval: float, the time to solve up to
         :param num_steps: int, the number of steps in the discretization
-        :param device: string, the device to do the computations on
-        :param seed: int, seed for torch
+        :param device: string, the device to do the computations on (default 'cpu')
+        :param seed: int, seed for torch (default 1)
         """
         self.sde = sde
-        self.time = time
+        self.time_interval = time_interval
         self.num_steps = num_steps
         self.device = device
         self.has_jumps = bool(self.sde.jump_rate())
@@ -51,7 +53,7 @@ class SdeSolver:
         assert bs >= 1, "Batch size must at least one"
         bs = int(bs)
 
-        h = torch.tensor(self.time / self.num_steps, device=self.device)
+        h = torch.tensor(self.time_interval / self.num_steps, device=self.device)
 
         paths = torch.empty(size=(bs, self.num_steps + 1, self.sde.dim), device=self.device)
 
@@ -94,7 +96,7 @@ class SdeSolver:
         assert bs >= 1, "Batch size must at least one"
         bs = int(bs)
 
-        h = torch.tensor(self.time / self.num_steps, device=self.device)
+        h = torch.tensor(self.time_interval / self.num_steps, device=self.device)
 
         paths = torch.empty(size=(bs, self.num_steps + 1, self.sde.dim), device=self.device)
 
@@ -118,7 +120,7 @@ class SdeSolver:
         fine, coarse = levels
         factor = int(fine / coarse)
 
-        h = torch.tensor(self.time / fine, device=self.device)
+        h = torch.tensor(self.time_interval / fine, device=self.device)
         paths_fine = torch.empty(size=(bs, fine + 1, self.sde.dim), device=self.device)
         paths_coarse = torch.empty(size=(bs, coarse + 1, self.sde.dim), device=self.device)
         paths_fine[:, 0] = self.sde.init_value.unsqueeze(0).repeat(bs, 1).to(self.device)
