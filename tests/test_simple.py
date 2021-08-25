@@ -187,21 +187,19 @@ def test_constant_short_rate():
 
 # solvers.py
 def test_solvers_gbm(gbm_2d_solver):
-    paths, (_, normals, _) = gbm_2d_solver.solve(bs=4, return_normals=True)
+    paths, (normals, _) = gbm_2d_solver.solve(bs=4, return_normals=True)
     assert not torch.isnan(paths).any()
     assert paths.shape == (4, 11, 2)
     assert normals.shape == (4, 10, 2)
 
 
 def test_solvers_merton(merton_1d_solver):
-    paths, (left_paths, normals, jumps) = merton_1d_solver.solve(bs=4, return_normals=True)
+    paths, (normals, jumps) = merton_1d_solver.solve(bs=4, return_normals=True)
     assert not torch.isnan(paths).any()
     assert paths.shape == (4, 11, 1)
-    assert left_paths.shape == (4, 11, 1)
     assert normals.shape == (4, 10, 1)
     assert jumps.shape == (4, 10, 1)
     all_jumps = torch.cat([torch.zeros_like(paths[:, :1, :]), jumps], dim=1)
-    #assert torch.allclose(all_jumps * left_paths + left_paths, paths)
 
 
 def test_multilevel_euler(gbm_1d_solver):

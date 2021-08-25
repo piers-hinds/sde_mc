@@ -32,12 +32,12 @@ def apply_control_variates(models, dl, jump_mean, rate, time_points, Ys):
 
     with torch.no_grad():
         for xb, yb in dl:
-            inputs = torch.cat([rep_time_points, xb[1].reshape(dl.batch_size * steps, dim)], dim=-1)
+            inputs = torch.cat([rep_time_points, xb[0].reshape(dl.batch_size * steps, dim)], dim=-1)
             g_out = g(inputs).view(dl.batch_size, steps, dim)
             f_out = f(inputs).view(dl.batch_size, steps, dim)
 
-            Zs = (xb[2] * f_out * discounts).sum(-1).sum(-1)
-            Js = (xb[3] * g_out * discounts).sum(-1).sum(-1)
+            Zs = (xb[1] * f_out * discounts).sum(-1).sum(-1)
+            Js = (xb[2] * g_out * discounts).sum(-1).sum(-1)
             comps = (- rate * jump_mean * g_out * discounts * h).sum(-1).sum(-1)
 
             gammas = (yb + Js + comps + Zs)
@@ -62,12 +62,12 @@ def train_control_variates(models, opt, dl, jump_mean, rate, time_points, Ys, ep
         for i, (xb, yb) in enumerate(dl):
             opt.zero_grad()
             f_in = torch.cat([rep_time_points, xb[0].reshape(dl.batch_size*steps, dim)], dim=-1)
-            g_in = torch.cat([rep_time_points, xb[1].reshape(dl.batch_size*steps, dim)], dim=-1)
+            g_in = torch.cat([rep_time_points, xb[0].reshape(dl.batch_size*steps, dim)], dim=-1)
             f_out = f(f_in).view(dl.batch_size, steps, dim)
             g_out = g(g_in).view(dl.batch_size, steps, dim)
 
-            brownians_cv = (xb[2] * f_out * discounts).sum(-1).sum(-1)
-            jumps_cv = (xb[3] * g_out * discounts).sum(-1).sum(-1)
+            brownians_cv = (xb[1] * f_out * discounts).sum(-1).sum(-1)
+            jumps_cv = (xb[2] * g_out * discounts).sum(-1).sum(-1)
             comps = (- rate * jump_mean * g_out * discounts * h).sum(-1).sum(-1)
 
             var_loss = (yb + jumps_cv + comps + brownians_cv).var()
