@@ -47,7 +47,7 @@ def apply_control_variates(models, dl, jump_mean, rate, time_points, Ys):
     return run_sum, run_sum_sq
 
 
-def train_control_variates(models, opt, dl, jump_mean, rate, time_points, Ys, epochs):
+def train_control_variates(models, opt, dl, jump_mean, rate, time_points, Ys, epochs, print_losses=True):
     f, g = models
     trials, steps, dim = dl.dataset.paths.shape
     rep_time_points = time_points.repeat(dl.batch_size).unsqueeze(-1)
@@ -75,13 +75,14 @@ def train_control_variates(models, opt, dl, jump_mean, rate, time_points, Ys, ep
             var_loss.backward()
             opt.step()
         loss_arr.append(run_loss / len(dl))
-        print('{}: Train loss: {:.5f}     95% confidence interval: {:.5f}'.format(epoch, loss_arr[epoch], np.sqrt(loss_arr[epoch])*2 / np.sqrt(trials)))
+        if print_losses:
+            print('{}: Train loss: {:.5f}     95% confidence interval: {:.5f}'.format(epoch, loss_arr[epoch], np.sqrt(loss_arr[epoch])*2 / np.sqrt(trials)))
         f.eval(); g.eval()
     end_train = time.time()
     return end_train-start_train, loss_arr
 
 
-def train_diffusion_control_variate(model, opt, dl, time_points, Ys, epochs):
+def train_diffusion_control_variate(model, opt, dl, time_points, Ys, epochs, print_losses=True):
     trials, steps, dim = dl.dataset.paths.shape
     rep_time_points = time_points.repeat(dl.batch_size).unsqueeze(-1)
     loss_arr = []
@@ -101,8 +102,9 @@ def train_diffusion_control_variate(model, opt, dl, time_points, Ys, epochs):
             var_loss.backward()
             opt.step()
         loss_arr.append(run_loss / len(dl))
-        print('{}: Train loss: {:.5f}     95% confidence interval: {:.5f}'.format(epoch, loss_arr[epoch], np.sqrt(
-            loss_arr[epoch]) * 2 / np.sqrt(trials)))
+        if print_losses:
+            print('{}: Train loss: {:.5f}     95% confidence interval: {:.5f}'.format(epoch, loss_arr[epoch], np.sqrt(
+                loss_arr[epoch]) * 2 / np.sqrt(trials)))
         model.eval()
     end_train = time.time()
     return end_train - start_train, loss_arr

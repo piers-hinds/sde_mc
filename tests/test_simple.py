@@ -1,5 +1,6 @@
 from sde_mc import *
 import pytest
+import torch.optim
 
 
 # Useful fixtures
@@ -76,6 +77,11 @@ def constant_short_rate():
 @pytest.fixture
 def sample_dataloader(gbm_1d_solver, euro_call, constant_short_rate):
     return simulate_data(10, gbm_1d_solver, euro_call, constant_short_rate, bs=2)
+
+
+@pytest.fixture
+def sample_jumps_dataloader(merton_1d_solver, euro_call, constant_short_rate):
+    return simulate_data(10, merton_1d_solver, euro_call, constant_short_rate, bs=2)
 
 
 @pytest.fixture
@@ -208,6 +214,36 @@ def test_multilevel_euler(gbm_1d_solver):
 
 
 # varred.py
+def test_train_cvs(mlps_1d, sample_jumps_dataloader):
+    trials, steps, dim = sample_jumps_dataloader.dataset.paths.shape
+    time_points = partition(3, steps, ends='left')
+    ys = time_points
+    adam = torch.optim.Adam(list(mlps_1d[0].parameters()) + list(mlps_1d[1].parameters()))
+    time_elapsed, loss_arr = train_control_variates(mlps_1d, adam, sample_jumps_dataloader, 0.1, 2, time_points, ys,
+                                                    epochs=10, print_losses=False)
+    assert time_elapsed >= 0
+    assert len(loss_arr) == 10
+
+
+def test_apply_cvs(mlps_1d, sample_jumps_dataloader):
+    trials, steps, dim = sample_jumps_dataloader.dataset.paths.shape
+    time_points = partition(3, steps, ends='left')
+    ys = time_points
+    run_sum, run_sum_sq = apply_control_variates(mlps_1d, sample_jumps_dataloader, 0.1, 2, time_points, ys)
+    assert run_sum_sq >= 0
+
+
+def test_train_dcv(mlps_1d, sample_dataloader):
+    trials, steps, dim = sample_dataloader.dataset.paths.shape
+    time_points = partition(3, steps, ends='left')
+    ys = time_points
+    adam = torch.optim.Adam(mlps_1d[0].parameters())
+    time_elapsed, loss_arr = train_diffusion_control_variate(mlps_1d[0], adam, sample_dataloader, time_points, ys,
+                                                             epochs=10, print_losses=False)
+    assert time_elapsed >= 0
+    assert len(loss_arr) == 10
+
+
 def test_apply_dcv(mlps_1d, sample_dataloader):
     trials, steps, dim = sample_dataloader.dataset.paths.shape
     time_points = partition(3, steps, ends='left')
@@ -238,6 +274,22 @@ def test_get_optimal_trials(gbm_1d_solver):
     assert len(opt_trials) == 3
 
 
+def test_simulate_data(gbm_2d_solver):
+    dl = simulate_data(16, gbm_2d_solver, EuroCall(1), ConstantShortRate(0.02), bs=16)
 
+
+def test_simulate_data_jumps(merton_1d_solver):
+    dl = simulate_data(16, merton_1d_solver, EuroCall(1), ConstantShortRate(0.02), bs=16)
+
+
+# nets.py
+def test_normal_path_data(gbm_2d_solver):
+    mc_stats = mc_simple(16, gbm_2d_solver, EuroCall(1), ConstantShortRate(0.02), return_normals=True)
+    data = NormalPathData(mc_stats.paths, mc_stats.payoffs, mc_stats.normals[0])
+
+
+def test_normal_jumps_path_data(merton_1d_solver):
+    mc_stats = mc_simple(16, merton_1d_solver, EuroCall(1), ConstantShortRate(0.02), return_normals=True)
+    data = NormalJumpsPathData(mc_stats.paths, mc_stats.payoffs, mc_stats.normals[0], mc_stats.normals[1])
 
 
