@@ -107,7 +107,7 @@ def mc_simple(num_trials, sde_solver, payoff, discounter=None, bs=None, return_n
 
 
 def mc_control_variates(models, opt, solver, trials, steps, payoff, discounter, sim_bs=(1e5, 1e5),
-                        bs=(1000, 1000), epochs=10):
+                        bs=(1000, 1000), epochs=10, print_losses=True):
     """Monte Carlo simulation of a functional of an SDE's terminal value with neural control variates
 
     Generates initial trajectories and payoffs on which regression is performed to find optimal control variates (a
@@ -144,6 +144,9 @@ def mc_control_variates(models, opt, solver, trials, steps, payoff, discounter, 
     :param epochs: int (default = 10)
         Number of epochs in training
 
+    :param print_losses: bool (default = True)
+        If True, prints the loss function values during training
+
     :return: MCStatistics
         The relevant MC statistics
     """
@@ -165,9 +168,10 @@ def mc_control_variates(models, opt, solver, trials, steps, payoff, discounter, 
     train_dataloader = simulate_data(train_trials, solver, payoff, discounter, bs=train_bs)
     if solver.has_jumps:
         _, losses = train_control_variates(models, opt, train_dataloader, jump_mean, rate, train_time_points,
-                                           train_ys, epochs)
+                                           train_ys, epochs, print_losses)
     else:
-        _, losses = train_diffusion_control_variate(models, opt, train_dataloader, train_time_points, train_ys, epochs)
+        _, losses = train_diffusion_control_variate(models, opt, train_dataloader, train_time_points, train_ys, epochs,
+                                                    print_losses)
     train_end = time.time()
     train_time = train_end - train_start
 

@@ -174,6 +174,11 @@ def test_binary_aon(terminals_1d):
     assert torch.allclose(binary_aon(terminals_1d), torch.tensor([1., 3., 0., 0.]))
 
 
+def test_digital(terminals_1d):
+    digital = Digital(1.)
+    assert torch.allclose(digital(terminals_1d), torch.tensor([0., 1., 0., 0.]))
+
+
 def test_basket(terminals_2d):
     basket = Basket(strike=1)
     assert torch.allclose(basket(terminals_2d), torch.tensor([0.5, 0, 0.05]))
@@ -205,7 +210,13 @@ def test_solvers_merton(merton_1d_solver):
     assert paths.shape == (4, 11, 1)
     assert normals.shape == (4, 10, 1)
     assert jumps.shape == (4, 10, 1)
-    all_jumps = torch.cat([torch.zeros_like(paths[:, :1, :]), jumps], dim=1)
+
+
+def test_solvers_heston(heston_1d_solver):
+    paths, (normals, _) = heston_1d_solver.solve(bs=8, return_normals=True)
+    assert not torch.isnan(paths).any()
+    assert paths.shape == (8, 11, 2)
+    assert normals.shape == (8, 10, 2)
 
 
 def test_multilevel_euler(gbm_1d_solver):
@@ -260,6 +271,19 @@ def test_mc_simple(gbm_2d_solver):
     assert mc_stats.sample_std > 0
     assert not mc_stats.payoffs.isnan().any()
     assert mc_stats.paths.shape == (100, 11, 2)
+
+
+def test_mc_simple_batch(gbm_1d_solver, euro_call, constant_short_rate):
+    mc_stats = mc_simple(100, gbm_1d_solver, euro_call, constant_short_rate, bs=17)
+    assert mc_stats.time_elapsed >= 0
+    assert mc_stats.sample_mean >= 0
+    assert mc_stats.sample_std > 0
+
+
+def test_mc_control_variates(merton_1d_solver, mlps_1d, euro_call, constant_short_rate):
+    adam = torch.optim.Adam(list(mlps_1d[0].parameters()) + list(mlps_1d[1].parameters()))
+    mc_stats = mc_control_variates(mlps_1d, adam, merton_1d_solver, (100, 100), (10, 20), euro_call, constant_short_rate,
+                                   sim_bs=(100, 100), bs=(10, 10), print_losses=False)
 
 
 def test_mc_multilevel(gbm_1d_solver):

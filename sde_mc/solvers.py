@@ -113,7 +113,7 @@ class SdeSolver:
                 sol = solve_quadratic(coefs)
                 paths[:, i + 1, 1] = sol * sol
                 t += h
-        return paths, (None, corr_normals, None)
+        return paths, (corr_normals, None)
 
     def multilevel_euler(self, bs, levels, return_normals=False):
         bs = int(bs)
