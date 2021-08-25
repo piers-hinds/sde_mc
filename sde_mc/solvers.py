@@ -37,9 +37,9 @@ class SdeSolver:
         normals = torch.randn(size=size, device=self.device) * torch.sqrt(h)
         return torch.matmul(self.lower_cholesky, normals).squeeze(-1)
 
-    def sample_poissons(self, size, h):
-        rates = torch.ones(size=size, device=self.device) * (self.sde.rate * h)
-        return torch.poisson(rates)
+    def sample_bernoullis(self, size, h):
+        rates = torch.ones(size=size, device=self.device) * (self.sde.jump_rate() * h)
+        return torch.bernoulli(rates)
 
     def sample_jumps(self, size):
         return self.sde.sample_jumps(size, self.device)
@@ -64,25 +64,25 @@ class SdeSolver:
         t = torch.tensor(0.0, device=self.device)
 
         if self.has_jumps:
-            paths_no_jumps = torch.empty(size=(bs, self.num_steps + 1, self.sde.dim), device=self.device)
-            paths_no_jumps[:, 0] = self.sde.init_value.unsqueeze(0).repeat(bs, 1).to(self.device)
-
-            poissons = self.sample_poissons(size=(bs, self.num_steps, self.sde.dim), h=h)
+            bernoullis = self.sample_bernoullis(size=(bs, self.num_steps, self.sde.dim), h=h)
             max_jumps = self.sample_jumps(size=(bs, self.num_steps, self.sde.dim))
-            jumps = (max_jumps * torch.gt(poissons, 0))
-
-            for i in range(self.num_steps):
-                paths_no_jumps[:, i + 1] = paths[:, i] + self.sde.drift(t, paths[:, i]) * h + \
-                                           self.sde.diffusion(t, paths[:, i]) * corr_normals[:, i]
-                paths[:, i + 1] = paths_no_jumps[:, i + 1] + paths[:, i] * jumps[:, i]
-                t += h
-            additional_data = (corr_normals, jumps)
+            jumps = (max_jumps * bernoullis)
         else:
-            for i in range(self.num_steps):
-                paths[:, i + 1] = paths[:, i] + self.sde.drift(t, paths[:, i]) * h + \
-                                  self.sde.diffusion(t, paths[:, i]) * corr_normals[:, i]
-                t += h
-            additional_data = (corr_normals, None)
+            jumps = None
+
+        for i in range(self.num_steps):
+            paths[:, i + 1] = paths[:, i] + self.sde.drift(t, paths[:, i]) * h + \
+                                       self.sde.diffusion(t, paths[:, i]) * corr_normals[:, i]
+            if self.has_jumps:
+                paths[:, i + 1] += self.sde.jumps(t, paths[:, i], jumps[:, i])
+            t += h
+        additional_data = (corr_normals, jumps)
+        # else:
+        #     for i in range(self.num_steps):
+        #         paths[:, i + 1] = paths[:, i] + self.sde.drift(t, paths[:, i]) * h + \
+        #                           self.sde.diffusion(t, paths[:, i]) * corr_normals[:, i]
+        #         t += h
+        #     additional_data = (corr_normals, None)
 
         if return_normals:
             return paths, additional_data
