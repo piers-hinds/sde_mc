@@ -84,7 +84,7 @@ class NormalPathData(Dataset):
 
 
 class NormalJumpsPathData(Dataset):
-    def __init__(self, paths, left_paths, payoffs, normals, jumps):
+    def __init__(self, paths, payoffs, normals, jumps):
         self.paths = paths[:, :-1]
         self.payoffs = payoffs
         self.normals = normals
