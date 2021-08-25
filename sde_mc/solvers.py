@@ -76,7 +76,7 @@ class SdeSolver:
                                            self.sde.diffusion(t, paths[:, i]) * corr_normals[:, i]
                 paths[:, i + 1] = paths_no_jumps[:, i + 1] + paths[:, i] * jumps[:, i]
                 t += h
-            additional_data = (paths_no_jumps, corr_normals, jumps)
+            additional_data = (paths, corr_normals, jumps)
         else:
             for i in range(self.num_steps):
                 paths[:, i + 1] = paths[:, i] + self.sde.drift(t, paths[:, i]) * h + \
