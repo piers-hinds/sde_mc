@@ -17,6 +17,10 @@ mc_stats = mc_simple(10, solver, call)
 print(mc_stats)
 
 
+grid = UniformGrid(0, 3, 10)
+for t in grid:
+    print(t)
+
 
 
 

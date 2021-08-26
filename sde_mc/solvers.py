@@ -1,4 +1,5 @@
 import torch
+from abc import ABC, abstractmethod
 from .helpers import solve_quadratic
 
 
@@ -50,15 +51,11 @@ class SdeSolver:
         :param return_normals: bool, if True returns the normal random variables used
         :return: torch.tensor, the paths simulated across (bs, steps, dimensions)
         """
-        assert bs >= 1, "Batch size must at least one"
         bs = int(bs)
-
         h = torch.tensor(self.time_interval / self.num_steps, device=self.device)
 
         paths = torch.empty(size=(bs, self.num_steps + 1, self.sde.dim), device=self.device)
-
         paths[:, 0] = self.sde.init_value.unsqueeze(0).repeat(bs, 1).to(self.device)
-
         corr_normals = self.sample_corr_normals(size=(bs, self.num_steps, self.sde.dim, 1), h=h)
 
         t = torch.tensor(0.0, device=self.device)
@@ -76,24 +73,13 @@ class SdeSolver:
             if self.has_jumps:
                 paths[:, i + 1] += self.sde.jumps(t, paths[:, i], jumps[:, i])
             t += h
-        additional_data = (corr_normals, jumps)
-        # else:
-        #     for i in range(self.num_steps):
-        #         paths[:, i + 1] = paths[:, i] + self.sde.drift(t, paths[:, i]) * h + \
-        #                           self.sde.diffusion(t, paths[:, i]) * corr_normals[:, i]
-        #         t += h
-        #     additional_data = (corr_normals, None)
 
-        if return_normals:
-            return paths, additional_data
-        else:
-            return paths, None
+        return paths, (corr_normals, jumps)
         
     def heston(self, bs=1, return_normals=False):
         """Custom scheme specifically for the Heston model. The asset price is simulated by the explicit
         Euler scheme, while the variance is simulated using the fully implicit Euler scheme to preserve 
         positivity."""
-        assert bs >= 1, "Batch size must at least one"
         bs = int(bs)
 
         h = torch.tensor(self.time_interval / self.num_steps, device=self.device)
@@ -140,4 +126,34 @@ class SdeSolver:
             paths_coarse[:, i + 1] = paths_coarse[:, i] + self.sde.drift(t, paths_coarse[:, i]) * h * factor + \
                                      self.sde.diffusion(t, paths_coarse[:, i]) * torch.sum(
                 corr_normals[:, (i * factor):((i + 1) * factor)], dim=1)
-        return (paths_fine, paths_coarse), (None, corr_normals, None)
+        return (paths_fine, paths_coarse), (corr_normals, None)
+
+
+class Grid(ABC):
+    def __init__(self, start, end):
+        self.start = start
+        self.end = end
+        self.time_interval = end-start
+        self.t = start
+
+    def __iter__(self):
+        return self
+
+    @abstractmethod
+    def __next__(self):
+        pass
+
+
+class UniformGrid(Grid):
+    def __init__(self, start, end, num_steps):
+        super(UniformGrid, self).__init__(start, end)
+        self.num_steps = num_steps
+        self.h = (end-start) / num_steps
+        assert self.h > 1e-8
+
+    def __next__(self):
+        if self.t > self.end - 1e-8:
+            raise StopIteration
+        t = self.t
+        self.t += self.h
+        return t
