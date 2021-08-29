@@ -57,19 +57,6 @@ class Mlp(nn.Module):
         return self.net(x)
 
 
-class PathData(Dataset):
-    def __init__(self, data, dim=1):
-        super(PathData, self).__init__()
-        self.data = data
-        self.dim = dim
-
-    def __len__(self):
-        return len(self.data)
-
-    def __getitem__(self, idx):
-        return self.data[idx, :(1+self.dim)], self.data[idx, (1+self.dim  ):]
-
-
 class NormalPathData(Dataset):
     def __init__(self, paths, payoffs, normals):
         self.paths = paths[:, :-1]
