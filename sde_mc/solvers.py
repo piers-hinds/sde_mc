@@ -8,11 +8,20 @@ class SdeSolver:
 
     def __init__(self, sde, time_interval, num_steps, device='cpu', seed=1):
         """
-        :param sde: Sde, the SDE to solve
-        :param time_interval: float, the time to solve up to
-        :param num_steps: int, the number of steps in the discretization
-        :param device: string, the device to do the computations on (default 'cpu')
-        :param seed: int, seed for torch (default 1)
+        :param sde: Sde
+            The SDE to solve
+
+        :param time_interval: float
+            The time to solve up to
+
+        :param num_steps: int
+            The number of steps in the discretization
+
+        :param device: string
+            The device to do the computations on (default 'cpu')
+
+        :param seed: int
+            Seed for torch (default 1)
         """
         self.sde = sde
         self.time_interval = time_interval
@@ -27,6 +36,17 @@ class SdeSolver:
         torch.manual_seed(seed)
 
     def solve(self, bs=1, return_normals=False, method=None):
+        """Solves the SDE using the method specified
+
+        :param bs: int (default = 1)
+            The batch size (the number of paths simulated simultaneously)
+
+        :param return_normals: bool (default = False)
+            If True returns the normal random variables used
+
+        :return: torch.tensor of shape (bs, steps, dimensions)
+            The paths simulated across
+        """
         if method is None:
             method = self.sde.simulation_method
         if method == 'euler':
@@ -47,9 +67,15 @@ class SdeSolver:
 
     def euler(self, bs, return_normals=False):
         """Implements the Euler method for solving SDEs
-        :param bs: int, the batch size (the number of paths simulated simultaneously)
-        :param return_normals: bool, if True returns the normal random variables used
-        :return: torch.tensor, the paths simulated across (bs, steps, dimensions)
+
+        :param bs: int
+            The batch size (the number of paths simulated simultaneously)
+
+        :param return_normals: bool
+            If True returns the normal random variables used
+
+        :return: torch.tensor of shape (bs, steps, dimensions)
+            The paths simulated across
         """
         bs = int(bs)
         h = torch.tensor(self.time_interval / self.num_steps, device=self.device)
