@@ -91,6 +91,11 @@ def mlps_1d():
     return [bcv, jcv]
 
 
+@pytest.fixture
+def uniform_grid():
+    return UniformGrid(0., 3., 10)
+
+
 # helpers.py
 def test_partition():
     expected = torch.tensor([0., 1., 2., 3.])
@@ -143,6 +148,11 @@ def test_heston(heston_1d):
     assert torch.allclose(heston_1d.drift(0, x), torch.tensor([[1.5*0.02, 0], [0.8*0.02, 0]]))
     assert torch.allclose(heston_1d.diffusion(0, x), torch.tensor([[1.5, 0], [0.8 * torch.sqrt(x[1, 1]), 0]]))
     assert torch.allclose(heston_1d.corr_matrix, torch.tensor([[1, -0.5], [-0.5, 1]]))
+
+
+def test_uniform_grid(uniform_grid):
+    grid_partition = torch.tensor([x for x in uniform_grid])
+    assert torch.allclose(grid_partition, partition(3, 10, ends='left'))
 
 
 # options.py
