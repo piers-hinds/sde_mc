@@ -74,13 +74,13 @@ def mc_simple(num_trials, sde_solver, payoff, discounter=None, bs=None, return_n
     if discounter is None:
         discounter = ConstantShortRate(r=0.0)
 
-    if payoff_time is 'terminal':
+    if payoff_time == 'terminal':
         payoff_index = sde_solver.num_steps
 
     if not bs:
         start = time.time()
         out, normals = sde_solver.solve(bs=num_trials, return_normals=return_normals)
-        if payoff_time is 'adapted':
+        if payoff_time == 'adapted':
             payoff_index = normals[5]
         spots = out[:, payoff_index]
         payoffs = payoff(spots) * discounter(sde_solver.time_interval)
@@ -101,7 +101,7 @@ def mc_simple(num_trials, sde_solver, payoff, discounter=None, bs=None, return_n
 
             remaining_trials -= bs
             out, normals = sde_solver.solve(bs=bs, return_normals=False)
-            if payoff_time is 'adapted':
+            if payoff_time == 'adapted':
                 payoff_index = normals[5]
             spots = out[:, payoff_index]
             payoffs = payoff(spots) * discounter(sde_solver.time_interval)
