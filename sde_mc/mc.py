@@ -43,7 +43,7 @@ class MCStatistics:
                                                                             self.time_elapsed)
 
 
-def mc_simple(num_trials, sde_solver, payoff, discounter=None, bs=None, return_normals=False, payoff_index=None):
+def mc_simple(num_trials, sde_solver, payoff, discounter=None, bs=None, return_normals=False, payoff_time='terminal'):
     """Run Monte Carlo simulations of a functional of an SDE's terminal value
 
     :param num_trials: int
@@ -65,7 +65,7 @@ def mc_simple(num_trials, sde_solver, payoff, discounter=None, bs=None, return_n
     :param return_normals: bool (default = False)
         If True returns the normal random variables used in the numerical integration
 
-    :param payoff_index: int (default = None = sde_solver.num_steps)
+    :param payoff_time: string (default = 'terminal')
         The index (time-step) at which to evaluate the payoff, defaults to the terminal time
 
     :return: MCStatistics
@@ -74,13 +74,15 @@ def mc_simple(num_trials, sde_solver, payoff, discounter=None, bs=None, return_n
     if discounter is None:
         discounter = ConstantShortRate(r=0.0)
 
-    if payoff_index is None:
+    if payoff_time is 'terminal':
         payoff_index = sde_solver.num_steps
 
     if not bs:
         start = time.time()
         out, normals = sde_solver.solve(bs=num_trials, return_normals=return_normals)
-        spots = out[:, sde_solver.num_steps]
+        if payoff_time is 'adapted':
+            payoff_index = normals[5]
+        spots = out[:, payoff_index]
         payoffs = payoff(spots) * discounter(sde_solver.time_interval)
 
         mn = payoffs.mean()
@@ -99,6 +101,8 @@ def mc_simple(num_trials, sde_solver, payoff, discounter=None, bs=None, return_n
 
             remaining_trials -= bs
             out, normals = sde_solver.solve(bs=bs, return_normals=False)
+            if payoff_time is 'adapted':
+                payoff_index = normals[5]
             spots = out[:, payoff_index]
             payoffs = payoff(spots) * discounter(sde_solver.time_interval)
 
