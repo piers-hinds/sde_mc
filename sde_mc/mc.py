@@ -43,7 +43,7 @@ class MCStatistics:
                                                                             self.time_elapsed)
 
 
-def mc_simple(num_trials, sde_solver, payoff, discounter=None, bs=None, return_normals=False):
+def mc_simple(num_trials, sde_solver, payoff, discounter=None, bs=None, return_normals=False, payoff_index=None):
     """Run Monte Carlo simulations of a functional of an SDE's terminal value
 
     :param num_trials: int
@@ -65,11 +65,17 @@ def mc_simple(num_trials, sde_solver, payoff, discounter=None, bs=None, return_n
     :param return_normals: bool (default = False)
         If True returns the normal random variables used in the numerical integration
 
+    :param payoff_index: int (default = None = sde_solver.num_steps)
+        The index (time-step) at which to evaluate the payoff, defaults to the terminal time
+
     :return: MCStatistics
         The relevant statistics from the MC simulation - see the MCStatistics class
     """
     if discounter is None:
         discounter = ConstantShortRate(r=0.0)
+
+    if payoff_index is None:
+        payoff_index = sde_solver.num_steps
 
     if not bs:
         start = time.time()
@@ -93,7 +99,7 @@ def mc_simple(num_trials, sde_solver, payoff, discounter=None, bs=None, return_n
 
             remaining_trials -= bs
             out, normals = sde_solver.solve(bs=bs, return_normals=False)
-            spots = out[:, sde_solver.num_steps]
+            spots = out[:, payoff_index]
             payoffs = payoff(spots) * discounter(sde_solver.time_interval)
 
             sample_sum += payoffs.sum()
