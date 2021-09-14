@@ -3,8 +3,8 @@ import numpy as np
 import torch
 from torch.utils.data import DataLoader
 from .varred import train_control_variates, apply_control_variates, train_diffusion_control_variate, \
-    apply_diffusion_control_variate
-from .nets import NormalJumpsPathData, NormalPathData
+    apply_diffusion_control_variate, train_adapted_control_variates, apply_adapted_control_variates
+from .nets import NormalJumpsPathData, NormalPathData, AdaptedPathData
 from .helpers import partition, mc_estimates
 from .options import ConstantShortRate
 
@@ -208,6 +208,86 @@ def mc_control_variates(models, opt, solver, trials, steps, payoff, discounter, 
     return MCStatistics(mn, sd, train_time+test_time)
 
 
+def mc_adaptive_cv(models, opt, solver, trials, steps, payoff, discounter, sim_bs=(1e4, 1e4), bs=(1000, 1000),
+                   epochs=10, print_losses=True):
+    """Monte Carlo simulation of a functional of an SDE's terminal value with neural control variates
+
+        Generates initial trajectories and payoffs on which regression is performed to find optimal control variates (a
+        coarser time grid can be used). Then the control variates can be used on newly generated trajectories to
+        significantly reduce variance.
+
+        :param models: list of nn.Module
+            The neural networks used to approximate the control variates for the brownian motion and the Poisson process
+
+        :param opt: optimizer
+            Optimizer from torch.optim used to step the parameters in models
+
+        :param solver: SdeSolver
+            The solver for the SDE
+
+        :param trials: (int, int)
+            Trials for the initial coarser simulation (training) and for the finer simulation (inference)
+
+        :param steps: (int, int)
+             Number of steps for the initial coarser simulation (training) and for the finer simulation (inference)
+
+        :param payoff: Option
+            The payoff function to be applied to the terminal value of the simulated SDE
+
+        :param discounter: Callable function of time
+            The discount function which returns the discount to be applied to the payoffs
+
+        :param sim_bs: (int, int) (default = (1e4, 1e4))
+            The batch sizes to simulate the trajectories (fine and coarse, respectively)
+
+        :param bs: (int, int) (default = (1e3, 1e3))
+            The batch sizes for training and inference, respectively
+
+        :param epochs: int (default = 10)
+            Number of epochs in training
+
+        :param print_losses: bool (default = True)
+            If True, prints the loss function values during training
+
+        :return: MCStatistics
+            The relevant MC statistics
+        """
+    # Config
+    jump_mean = solver.sde.jump_mean()
+    rate = solver.sde.jump_rate()
+    train_trials, test_trials = trials
+    train_steps, test_steps = steps
+    train_bs, test_bs = bs
+    train_sim_bs, test_sim_bs = sim_bs
+    solver.num_steps = train_steps
+
+    # Training
+    train_start = time.time()
+    train_dataloader = simulate_adapted_data(train_trials, solver, payoff, discounter, bs=train_bs)
+    _ = train_adapted_control_variates(models, opt, train_dataloader, discounter, jump_mean, rate, epochs, print_losses)
+    train_end = time.time()
+    train_time = train_end - train_start
+
+    # Inference
+    start_test = time.time()
+    solver.num_steps = test_steps
+    run_sum, run_sum_sq = 0, 0
+    trials_remaining = test_trials
+    while trials_remaining > 0:
+        batch_size = min(test_sim_bs, trials_remaining)
+        trials_remaining -= batch_size
+        test_dataloader = simulate_adapted_data(batch_size, solver, payoff, discounter, bs=test_bs, inference=True)
+        x, y = apply_adapted_control_variates(models, test_dataloader, discounter, jump_mean, rate)
+        run_sum += x
+        run_sum_sq += y
+
+    mn, var = mc_estimates(run_sum, run_sum_sq, test_trials)
+    sd = var.sqrt() / torch.tensor(test_trials).sqrt()
+    end_test = time.time()
+    test_time = end_test - start_test
+    return MCStatistics(mn, sd, train_time+test_time)
+
+
 def mc_multilevel(trials, levels, solver, payoff, discounter, bs=None):
     """Runs a multilevel Monte Carlo simulation of a functional of the terminal value of an SDE
 
@@ -263,7 +343,8 @@ def mc_multilevel(trials, levels, solver, payoff, discounter, bs=None):
         while trials_remaining > 0:
             next_batch_size = min(trials_remaining, bs[i + 1])
             (paths_fine, paths_coarse), _ = solver.multilevel_euler(next_batch_size, pair)
-            terminals = discounter(solver.time_interval) * (payoff(paths_fine[:, pair[0]]) - payoff(paths_coarse[:, pair[1]]))
+            terminals = discounter(solver.time_interval) * (payoff(paths_fine[:, pair[0]]) -
+                                                            payoff(paths_coarse[:, pair[1]]))
             run_sum += terminals.sum()
             run_sum_sq += (terminals * terminals).sum()
             trials_remaining -= next_batch_size
@@ -293,6 +374,15 @@ def simulate_data(trials, solver, payoff, discounter, bs=1000, inference=False):
     return DataLoader(dset, batch_size=bs, shuffle=not inference, drop_last=not inference)
 
 
+def simulate_adapted_data(trials, solver, payoff, discounter, bs=1000, inference=False):
+    mc_stats = mc_simple(trials, solver, payoff, discounter, return_normals=True, payoff_time='adapted')
+    if solver.has_jumps:
+        paths, (normals, jumps, jump_times, time_paths, left_paths, jump_paths, total_steps) = mc_stats.paths, mc_stats.normals
+        payoffs = mc_stats.payoffs
+        dset = AdaptedPathData(paths, payoffs, normals, jumps, jump_times, left_paths, time_paths, total_steps, jump_paths)
+    return DataLoader(dset, batch_size=bs, shuffle=not inference, drop_last=not inference)
+
+
 def get_optimal_trials(trials, levels, epsilon, solver, payoff, discounter):
     """Finds the optimal number of trials at each level for the MLMC method (for a given tolerence)"""
 
@@ -307,7 +397,8 @@ def get_optimal_trials(trials, levels, epsilon, solver, payoff, discounter):
 
     for i, pair in enumerate(pairs):
         (paths_fine, paths_coarse), _ = solver.multilevel_euler(trials, pair)
-        terminals = discounter(solver.time_interval) * (payoff(paths_fine[:, pair[0]]) - payoff(paths_coarse[:, pair[1]]))
+        terminals = discounter(solver.time_interval) * (payoff(paths_fine[:, pair[0]]) -
+                                                        payoff(paths_coarse[:, pair[1]]))
         vars[i + 1] = terminals.var()
 
     sum_term = (vars / step_sizes).sqrt().sum()

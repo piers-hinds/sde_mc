@@ -44,6 +44,9 @@ class SdeSolver:
         :param return_normals: bool (default = False)
             If True returns the normal random variables used
 
+        :param method: string (default = None)
+            The numerical method to use
+
         :return: torch.tensor of shape (bs, steps, dimensions)
             The paths simulated across
         """
@@ -119,12 +122,12 @@ class SdeSolver:
         t = torch.tensor(0.0, device=self.device)
 
         for i in range(self.num_steps):
-                paths[:, i + 1] = paths[:, i] + self.sde.drift(t, paths[:, i]) * h + \
-                                  self.sde.diffusion(t, paths[:, i]) * corr_normals[:, i]
-                coefs = self.sde.quadratic_parameters(paths[:, i, 1], h, corr_normals[:, i, 1])
-                sol = solve_quadratic(coefs)
-                paths[:, i + 1, 1] = sol * sol
-                t += h
+            paths[:, i + 1] = paths[:, i] + self.sde.drift(t, paths[:, i]) * h + \
+                self.sde.diffusion(t, paths[:, i]) * corr_normals[:, i]
+            coefs = self.sde.quadratic_parameters(paths[:, i, 1], h, corr_normals[:, i, 1])
+            sol = solve_quadratic(coefs)
+            paths[:, i + 1, 1] = sol * sol
+            t += h
         return paths, (corr_normals, None)
 
     def multilevel_euler(self, bs, levels, return_normals=False):
@@ -150,9 +153,82 @@ class SdeSolver:
                                                     corr_normals[:, i * factor + j]
             # step the coarse approximation
             paths_coarse[:, i + 1] = paths_coarse[:, i] + self.sde.drift(t, paths_coarse[:, i]) * h * factor + \
-                                     self.sde.diffusion(t, paths_coarse[:, i]) * torch.sum(
-                corr_normals[:, (i * factor):((i + 1) * factor)], dim=1)
+                self.sde.diffusion(t, paths_coarse[:, i]) * \
+                torch.sum(corr_normals[:, (i * factor):((i + 1) * factor)], dim=1)
         return (paths_fine, paths_coarse), (corr_normals, None)
+
+
+class JumpAdaptedSolver(SdeSolver):
+    def __init__(self, sde, time_interval, num_steps, device='cpu', seed=1):
+        super(JumpAdaptedSolver, self).__init__(sde, time_interval, num_steps, device, seed)
+        self.MAX_JUMPS = max(int(self.time_interval * self.sde.jump_rate() * 10), 5)
+
+    def euler(self, bs, return_normals=False):
+        bs = int(bs)
+        h = torch.tensor(self.time_interval / self.num_steps, device=self.device)
+
+        # at most there will be num_steps + MAX_JUMPS + 1 number of observations
+        paths = torch.zeros(size=(bs, self.num_steps + self.MAX_JUMPS + 1, self.sde.dim), device=self.device)
+        left_paths = torch.zeros_like(paths)
+        time_paths = torch.zeros_like(paths) + self.time_interval
+        x = self.sde.init_value.unsqueeze(0).repeat(bs, 1).to(self.device)
+        paths[:, 0] = x
+        left_paths[:, 0] = x
+        t = torch.zeros((bs, 1), device=self.device)
+        time_paths[:, 0] = t
+
+        # storage for normals
+        normals = torch.zeros(size=(bs, self.num_steps + self.MAX_JUMPS, self.sde.dim), device=self.device)
+        # storage fo jump paths
+        jump_paths = torch.zeros_like(paths)
+
+        jump_times = self.sample_jump_times(size=(bs, self.MAX_JUMPS, self.sde.dim))
+        jumps = self.sample_jumps(size=(bs, self.MAX_JUMPS, self.sde.dim))
+
+        jump_idxs = torch.zeros_like(jump_times[:, 0, :]).long()
+
+        total_steps = 0
+        while torch.any(t < self.time_interval):
+            # counts the number of steps in total
+            total_steps += 1
+
+            # times and sizes of the next jump
+            next_jump_time = jump_times[torch.arange(bs), jump_idxs.squeeze(-1), :]
+            next_jump_size = jumps[torch.arange(bs), jump_idxs.squeeze(-1), :]
+
+            # time step is minimum of (mesh size, time to next jump, time to end of interval)
+            h = torch.minimum(h, torch.maximum(self.time_interval - t, torch.tensor(0.)))
+            dt = torch.minimum(h, next_jump_time - t)
+            assert (next_jump_time > t).all()
+            # step diffusion until the next time step
+            x, normals[:, total_steps - 1] = self.step_diffusion(t, x, dt)
+            left_paths[:, total_steps] = x
+            t += dt
+            time_paths[:, total_steps] = t
+
+            # add jumps if the next jump is now - could sample jumps here if storage issues
+            current_jumps = torch.where(torch.isclose(next_jump_time, t), next_jump_size,
+                                        torch.zeros_like(next_jump_size))
+            jump_paths[:, total_steps] = current_jumps
+            x += self.add_jumps(t, x, current_jumps)
+
+            # store in path
+            paths[:, total_steps] = x
+
+            # increment jump index if a jump has just happened
+            jump_idxs = torch.where(torch.isclose(next_jump_time, t), jump_idxs + 1, jump_idxs)
+
+        return paths, (normals, jumps, jump_times, time_paths, left_paths, total_steps, jump_paths)
+
+    def step_diffusion(self, t, x, h):
+        corr_normals = self.sample_corr_normals(x.shape + torch.Size([1]), h)
+        return x + self.sde.drift(t, x) * h + self.sde.diffusion(t, x) * corr_normals, corr_normals
+
+    def add_jumps(self, t, x, jumps):
+        return self.sde.jumps(t, x, jumps)
+
+    def sample_jump_times(self, size):
+        return torch.empty(size, device=self.device).exponential_(self.sde.jump_rate()).cumsum(dim=1)
 
 
 class Grid(ABC):
