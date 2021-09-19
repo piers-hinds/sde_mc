@@ -1,4 +1,3 @@
-import torch
 import torch.nn as nn
 from torch.utils.data import Dataset
 
@@ -83,3 +82,22 @@ class NormalJumpsPathData(Dataset):
     def __getitem__(self, idx):
         return (self.paths[idx], self.normals[idx], self.jumps[idx]), self.payoffs[idx]
 
+
+class AdaptedPathData(Dataset):
+    def __init__(self, paths, payoffs, normals, jumps, jump_times, left_paths, time_paths, jump_paths, total_steps):
+        self.paths = paths[:, :-1]
+        self.payoffs = payoffs
+        self.normals = normals
+        self.jumps = jumps
+        self.jump_times = jump_times
+        self.left_paths = left_paths[:, :-1]
+        self.time_paths = time_paths[:, :-1]
+        self.jump_paths = jump_paths[:, :-1]
+        self.total_steps = total_steps
+
+    def __len__(self):
+        return len(self.payoffs)
+
+    def __getitem__(self, idx):
+        return (self.paths[idx], self.normals[idx], self.jumps[idx], self.jump_times[idx], self.left_paths[idx],
+                self.time_paths[idx], self.jump_paths[idx]), self.payoffs[idx]
