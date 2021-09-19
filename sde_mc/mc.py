@@ -177,8 +177,8 @@ def mc_control_variates(models, opt, solver, trials, steps, payoff, discounter, 
     train_ys, test_ys = discounter(train_time_points), discounter(test_time_points)
 
     # Training
+    train_start = time.time()
     if not no_train:
-        train_start = time.time()
         train_dataloader = simulate_data(train_trials, solver, payoff, discounter, bs=train_bs)
         if solver.has_jumps:
             _, losses = train_control_variates(models, opt, train_dataloader, jump_mean, rate, train_time_points,
@@ -186,8 +186,8 @@ def mc_control_variates(models, opt, solver, trials, steps, payoff, discounter, 
         else:
             _, losses = train_diffusion_control_variate(models, opt, train_dataloader, train_time_points, train_ys, epochs,
                                                         print_losses)
-        train_end = time.time()
-        train_time = train_end - train_start
+    train_end = time.time()
+    train_time = train_end - train_start
 
     # Inference
     start_test = time.time()
