@@ -190,6 +190,7 @@ def mc_control_variates(models, opt, solver, trials, steps, payoff, discounter, 
     train_time = train_end - train_start
 
     # Inference
+    solver.num_steps = test_steps
     mc_stats = mc_apply_cvs(models, solver, test_trials, payoff, discounter, test_sim_bs, test_bs)
     mc_stats.time_elapsed += train_time
     return mc_stats
