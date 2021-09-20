@@ -190,26 +190,59 @@ def mc_control_variates(models, opt, solver, trials, steps, payoff, discounter, 
     train_time = train_end - train_start
 
     # Inference
+    mc_stats = mc_apply_cvs(models, solver, test_trials, payoff, discounter, test_sim_bs, test_bs)
+    mc_stats.time_elapsed += train_time
+    return mc_stats
+
+
+def mc_apply_cvs(models, solver, trials, payoff, discounter, sim_bs=1e5, bs=1000):
+    """Monte Carlo simulation of a function of SDE's terminal value with applied control variates
+
+    :param models: callable(s)
+        The control variate function(s). If multiple, pass in a tuple or list
+
+    :param solver: SdeSolver
+        The solver object for the SDE
+
+    :param trials: int
+        The number of Monte Carlo trials
+
+    :param payoff: Option
+        The payoff function to be applied to the terminal values
+
+    :param discounter: Discounter
+        The discounter to be applied to the terminal spot values
+
+    :param sim_bs: int
+        The batch size for the simulation of the trajectories
+
+    :param bs: int
+        The batch size for applying the control variate(s)
+
+    :return: MCStatisitics
+        The relevant stats from the MC simulation
+    """
     start_test = time.time()
-    solver.num_steps = test_steps
+    time_points = partition(solver.time_interval, solver.num_steps, ends='left', device=solver.device)
+    ys = discounter(time_points)
     run_sum, run_sum_sq = 0, 0
-    trials_remaining = test_trials
+    trials_remaining = trials
     while trials_remaining > 0:
-        batch_size = min(test_sim_bs, trials_remaining)
+        batch_size = min(sim_bs, trials_remaining)
         trials_remaining -= batch_size
-        test_dataloader = simulate_data(batch_size, solver, payoff, discounter, bs=test_bs, inference=True)
+        test_dataloader = simulate_data(batch_size, solver, payoff, discounter, bs=bs, inference=True)
         if solver.has_jumps:
-            x, y = apply_control_variates(models, test_dataloader, jump_mean, rate, test_time_points, test_ys)
+            x, y = apply_control_variates(models, test_dataloader, solver.sde.jump_mean(), solver.sde.jump_rate(), time_points, ys)
         else:
-            x, y = apply_diffusion_control_variate(models, test_dataloader, test_time_points, test_ys)
+            x, y = apply_diffusion_control_variate(models, test_dataloader, time_points, ys)
         run_sum += x
         run_sum_sq += y
 
-    mn, var = mc_estimates(run_sum, run_sum_sq, test_trials)
-    sd = var.sqrt() / torch.tensor(test_trials).sqrt()
+    mn, var = mc_estimates(run_sum, run_sum_sq, trials)
+    sd = var.sqrt() / torch.tensor(trials).sqrt()
     end_test = time.time()
     test_time = end_test - start_test
-    return MCStatistics(mn, sd, train_time+test_time)
+    return MCStatistics(mn, sd, test_time)
 
 
 def mc_adaptive_cv(models, opt, solver, trials, steps, payoff, discounter, sim_bs=(1e4, 1e4), bs=(1000, 1000),
