@@ -120,8 +120,9 @@ def bs_digital_call(spot, strike, expiry, r, sigma):
     :return: float
         The value of the option
     """
-    return spot * (1 - lognorm.cdf(strike, s=sigma * np.sqrt(expiry), loc=r * expiry - 0.5 * sigma * \
-        sigma * expiry)) * np.exp(-r * expiry)
+    mn = np.log(spot) + (r - 0.5 * sigma * sigma) * expiry
+    sd = sigma * np.sqrt(expiry)
+    return (1 - lognorm.cdf(strike, s=sd, scale=np.exp(mn))) * np.exp(-r * expiry)
 
 
 class Option(ABC):
