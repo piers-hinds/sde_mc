@@ -317,6 +317,12 @@ def test_simulate_data_jumps(merton_1d_solver):
 
 
 # nets.py
+def test_lstm():
+    x = torch.tensor([[[1., 2.], [3., 4.]]])
+    lstm = Lstm(2, 20, 1)
+    out = lstm(x)
+
+
 def test_normal_path_data(gbm_2d_solver):
     mc_stats = mc_simple(16, gbm_2d_solver, EuroCall(1), ConstantShortRate(0.02), return_normals=True)
     data = NormalPathData(mc_stats.paths, mc_stats.payoffs, mc_stats.normals[0])
