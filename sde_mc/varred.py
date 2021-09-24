@@ -137,7 +137,7 @@ def apply_control_variates(models, dl, solver, discounter):
     return run_sum, run_sum_sq
 
 
-def apply_adapted_control_variates(models, dl, discounter, rate, jump_mean):
+def apply_adapted_control_variates(models, dl, solver, discounter):
     n, steps, dim = dl.dataset.paths.shape
     total_steps = dl.dataset.total_steps
     f, g = models
@@ -157,16 +157,16 @@ def apply_adapted_control_variates(models, dl, discounter, rate, jump_mean):
             g_outputs = g(g_inputs).view(dl.batch_size, steps, dim)
             jump_cv = (g_outputs * discounts * jump_paths).sum(-1).sum(-1)
 
-            comps = (- rate * jump_mean * g_outputs[:, :-1] * discounts[:, :-1] * h).sum(-1).sum(-1)
+            comps = (- solver.sde.jump_rate() * solver.sde.jump_mean() * g_outputs[:, :-1] *
+                     discounts[:, :-1] * h).sum(-1).sum(-1)
             gammas = payoffs + brownian_cv + jump_cv + comps
             run_sum += gammas.sum()
             run_sum_sq += (gammas * gammas).sum()
     return run_sum, run_sum_sq
 
 
-def train_adapted_control_variates(models, opt, dl, discounter, rate, jump_mean, epochs=10, print_losses=True):
+def train_adapted_control_variates(models, opt, dl, solver, discounter, epochs=10, print_losses=True):
     trials, steps, dim = dl.dataset.paths.shape
-    total_steps = dl.dataset.total_steps
     loss_arr = []
     f, g = models
     for epoch in range(epochs):
@@ -189,7 +189,8 @@ def train_adapted_control_variates(models, opt, dl, discounter, rate, jump_mean,
             g_outputs = g(g_inputs).view(dl.batch_size, steps, dim)
             jump_cv = (g_outputs * discounts * jump_paths).sum(-1).sum(-1)
 
-            comps = (- rate * jump_mean * g_outputs[:, :-1] * discounts[:, :-1] * h).sum(-1).sum(-1)
+            comps = (- solver.sde.jump_rate() * solver.sde.jump_mean() * g_outputs[:, :-1] *
+                     discounts[:, :-1] * h).sum(-1).sum(-1)
             gammas = payoffs + brownian_cv + jump_cv + comps
 
             var_loss = gammas.var()

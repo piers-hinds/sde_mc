@@ -288,7 +288,7 @@ def mc_adaptive_cv(models, opt, solver, trials, steps, payoff, discounter, sim_b
     # Training
     train_start = time.time()
     train_dataloader = simulate_adapted_data(train_trials, solver, payoff, discounter, bs=train_bs)
-    _ = train_adapted_control_variates(models, opt, train_dataloader, discounter, jump_mean, rate, epochs, print_losses)
+    _ = train_adapted_control_variates(models, opt, train_dataloader, solver, discounter, epochs, print_losses)
     train_end = time.time()
     train_time = train_end - train_start
 
@@ -301,7 +301,7 @@ def mc_adaptive_cv(models, opt, solver, trials, steps, payoff, discounter, sim_b
         batch_size = min(test_sim_bs, trials_remaining)
         trials_remaining -= batch_size
         test_dataloader = simulate_adapted_data(batch_size, solver, payoff, discounter, bs=test_bs, inference=True)
-        x, y = apply_adapted_control_variates(models, test_dataloader, discounter, jump_mean, rate)
+        x, y = apply_adapted_control_variates(models, test_dataloader, solver, discounter)
         run_sum += x
         run_sum_sq += y
 
