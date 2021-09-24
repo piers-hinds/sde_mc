@@ -401,9 +401,9 @@ def simulate_data(trials, solver, payoff, discounter, bs=1000, inference=False):
 def simulate_adapted_data(trials, solver, payoff, discounter, bs=1000, inference=False):
     mc_stats = mc_simple(trials, solver, payoff, discounter, return_normals=True, payoff_time='adapted')
     if solver.has_jumps:
-        paths, (normals, time_paths, left_paths, jump_paths, total_steps) = mc_stats.paths, mc_stats.normals
+        paths, (normals, time_paths, left_paths, total_steps, jump_paths) = mc_stats.paths, mc_stats.normals
         payoffs = mc_stats.payoffs
-        dset = AdaptedPathData(paths, payoffs, normals, left_paths, time_paths, total_steps, jump_paths)
+        dset = AdaptedPathData(paths, payoffs, normals, left_paths, time_paths, jump_paths, total_steps)
     return DataLoader(dset, batch_size=bs, shuffle=not inference, drop_last=not inference)
 
 
@@ -417,7 +417,7 @@ def sim_train_control_variates(models, opt, solver, trials, payoff, discounter, 
 
 
 def get_optimal_trials(trials, levels, epsilon, solver, payoff, discounter):
-    """Finds the optimal number of trials at each level for the MLMC method (for a given tolerence)"""
+    """Finds the optimal number of trials at each level for the MLMC method (for a given tolerance)"""
 
     vars = torch.zeros(len(levels))
     pairs = [(levels[i + 1], levels[i]) for i in range(0, len(levels) - 1)]

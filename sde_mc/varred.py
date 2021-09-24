@@ -170,7 +170,7 @@ def train_adapted_control_variates(models, opt, dl, solver, discounter, epochs=1
     loss_arr = []
     f, g = models
     for epoch in range(epochs):
-        f.train(), g.train()
+        f.train(); g.train()
         run_loss = 0
         for (paths, normals, left_paths, time_paths, jump_paths), payoffs in dl:
             opt.zero_grad()
