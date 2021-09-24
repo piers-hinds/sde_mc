@@ -1,76 +1,99 @@
 import torch
 import numpy as np
 import time
+from .helpers import partition
 
 
-def apply_diffusion_control_variate(model, dl, time_points, Ys):
-    n, steps, dim = dl.dataset.paths.shape
-    run_sum = 0
-    run_sum_sq = 0
-    discounts = Ys.view(1, len(Ys), 1)
-    rep_time_points = time_points.repeat(dl.batch_size).unsqueeze(-1)
+def train_diffusion_control_variate(model, opt, dl, solver, discounter, epochs, print_losses):
+    trials, steps, dim = dl.dataset.paths.shape
+    time_points = partition(solver.time_interval, solver.num_steps, ends='left', device=solver.device)
 
-    with torch.no_grad():
-        for xb, yb in dl:
-            inputs = torch.cat([rep_time_points, xb[0].reshape(dl.batch_size * steps, dim)], dim=-1)
-            f_out = model(inputs).view(dl.batch_size, steps, dim)
-            brownians_cv = (xb[1] * f_out * discounts).sum(-1).sum(-1)
-            gammas = (yb + brownians_cv)
+    discounts = discounter(time_points).view(1, len(time_points), 1)
+    loss_arr = []
+
+    start_train = time.time()
+    for epoch in range(epochs):
+        model.train()
+        run_loss = 0
+        for (paths, normals), payoffs in dl:
+            opt.zero_grad()
+
+            if model.sequential:
+                rep_time_points = time_points.unsqueeze(-1).repeat(dl.batch_size, 1, 1)
+                f_in = torch.cat([rep_time_points, paths], dim=-1)
+            else:
+                rep_time_points = time_points.repeat(dl.batch_size).unsqueeze(-1)
+                f_in = torch.cat([rep_time_points, paths.reshape(dl.batch_size * steps, dim)], dim=-1)
+
+            f_out = model(f_in).view(dl.batch_size, steps, dim)
+            brownians_cv = (normals * f_out * discounts).sum(-1).sum(-1)
+            var_loss = (payoffs + brownians_cv).var()
+            run_loss += var_loss.item()
+            var_loss.backward()
+            opt.step()
+        loss_arr.append(run_loss / len(dl))
+        if print_losses:
+            print('{}: Train loss: {:.5f}     95% confidence interval: {:.5f}'.format(epoch, loss_arr[epoch], np.sqrt(
+                loss_arr[epoch]) * 2 / np.sqrt(trials)))
+        model.eval()
+    end_train = time.time()
+    return end_train - start_train, loss_arr
+
+
+def apply_diffusion_control_variate(model, dl, solver, discounter):
+    trials, steps, dim = dl.dataset.paths.shape
+    time_points = partition(solver.time_interval, solver.num_steps, ends='left', device=solver.device)
+    rep_time_points = time_points.unsqueeze(-1).repeat(dl.batch_size, 1, 1)
+    discounts = discounter(time_points).view(1, len(time_points), 1)
+
+    run_sum, run_sum_sq = 0, 0
+    with torch.inference_mode():
+        for (paths, normals), payoffs in dl:
+            if model.sequential:
+                rep_time_points = time_points.unsqueeze(-1).repeat(dl.batch_size, 1, 1)
+                f_in = torch.cat([rep_time_points, paths], dim=-1)
+            else:
+                rep_time_points = time_points.repeat(dl.batch_size).unsqueeze(-1)
+                f_in = torch.cat([rep_time_points, paths.reshape(dl.batch_size * steps, dim)], dim=-1)
+            f_out = model(f_in).view(dl.batch_size, steps, dim)
+            brownians_cv = (normals * f_out * discounts).sum(-1).sum(-1)
+            gammas = payoffs + brownians_cv
             run_sum += gammas.sum()
             run_sum_sq += (gammas * gammas).sum()
     return run_sum, run_sum_sq
 
 
-def apply_control_variates(models, dl, jump_mean, rate, time_points, Ys):
-    f, g = models
-    n, steps, dim = dl.dataset.paths.shape
-    run_sum = 0
-    run_sum_sq = 0
-    h = time_points[1] - time_points[0]
-    discounts = Ys.view(1, len(Ys), 1)
-    rep_time_points = time_points.repeat(dl.batch_size).unsqueeze(-1)
-
-    with torch.no_grad():
-        for xb, yb in dl:
-            inputs = torch.cat([rep_time_points, xb[0].reshape(dl.batch_size * steps, dim)], dim=-1)
-            g_out = g(inputs).view(dl.batch_size, steps, dim)
-            f_out = f(inputs).view(dl.batch_size, steps, dim)
-
-            Zs = (xb[1] * f_out * discounts).sum(-1).sum(-1)
-            Js = (xb[2] * g_out * discounts).sum(-1).sum(-1)
-            comps = (- rate * jump_mean * g_out * discounts * h).sum(-1).sum(-1)
-
-            gammas = (yb + Js + comps + Zs)
-            run_sum += gammas.sum()
-            run_sum_sq += (gammas * gammas).sum()
-
-    return run_sum, run_sum_sq
-
-
-def train_control_variates(models, opt, dl, jump_mean, rate, time_points, Ys, epochs, print_losses=True):
+def train_control_variates(models, opt, dl, solver, discounter, epochs, print_losses=True):
     f, g = models
     trials, steps, dim = dl.dataset.paths.shape
-    rep_time_points = time_points.repeat(dl.batch_size).unsqueeze(-1)
+    time_points = partition(solver.time_interval, solver.num_steps, ends='left', device=solver.device)
     h = time_points[1] - time_points[0]
     loss_arr = []
-    discounts = Ys.view(1, len(Ys), 1)
+    discounts = discounter(time_points).view(1, len(time_points), 1)
 
     start_train = time.time()
     for epoch in range(epochs):
         f.train(); g.train()
         run_loss = 0
-        for i, (xb, yb) in enumerate(dl):
+        for i, ((paths, normals, jumps), payoffs) in enumerate(dl):
             opt.zero_grad()
-            f_in = torch.cat([rep_time_points, xb[0].reshape(dl.batch_size*steps, dim)], dim=-1)
-            g_in = torch.cat([rep_time_points, xb[0].reshape(dl.batch_size*steps, dim)], dim=-1)
+            if f.sequential:
+                rep_time_points = time_points.unsqueeze(-1).repeat(dl.batch_size, 1, 1)
+                f_in = torch.cat([rep_time_points, paths], dim=-1)
+                g_in = torch.cat([rep_time_points, paths], dim=-1)
+            else:
+                rep_time_points = time_points.repeat(dl.batch_size).unsqueeze(-1)
+                f_in = torch.cat([rep_time_points, paths.reshape(dl.batch_size * steps, dim)], dim=-1)
+                g_in = torch.cat([rep_time_points, paths.reshape(dl.batch_size * steps, dim)], dim=-1)
+
             f_out = f(f_in).view(dl.batch_size, steps, dim)
             g_out = g(g_in).view(dl.batch_size, steps, dim)
 
-            brownians_cv = (xb[1] * f_out * discounts).sum(-1).sum(-1)
-            jumps_cv = (xb[2] * g_out * discounts).sum(-1).sum(-1)
-            comps = (- rate * jump_mean * g_out * discounts * h).sum(-1).sum(-1)
+            brownians_cv = (normals * f_out * discounts).sum(-1).sum(-1)
+            jumps_cv = (jumps * g_out * discounts).sum(-1).sum(-1)
+            comps = (- solver.sde.jump_rate() * solver.sde.jump_mean() * g_out * discounts * h).sum(-1).sum(-1)
 
-            var_loss = (yb + jumps_cv + comps + brownians_cv).var()
+            var_loss = (payoffs + jumps_cv + comps + brownians_cv).var()
             run_loss += var_loss.item()
             var_loss.backward()
             opt.step()
@@ -82,32 +105,143 @@ def train_control_variates(models, opt, dl, jump_mean, rate, time_points, Ys, ep
     return end_train-start_train, loss_arr
 
 
-def train_diffusion_control_variate(model, opt, dl, time_points, Ys, epochs, print_losses=True):
+def apply_control_variates(models, dl, solver, discounter):
+    f, g = models
     trials, steps, dim = dl.dataset.paths.shape
-    rep_time_points = time_points.repeat(dl.batch_size).unsqueeze(-1)
-    loss_arr = []
-    discounts = Ys.view(1, len(Ys), 1)
+    time_points = partition(solver.time_interval, solver.num_steps, ends='left', device=solver.device)
+    h = time_points[1] - time_points[0]
+    discounts = discounter(time_points).view(1, len(time_points), 1)
 
-    start_train = time.time()
-    for epoch in range(epochs):
-        model.train()
-        run_loss = 0
-        for i, (xb, yb) in enumerate(dl):
-            opt.zero_grad()
-            f_in = torch.cat([rep_time_points, xb[0].reshape(dl.batch_size * steps, dim)], dim=-1)
-            f_out = model(f_in).view(dl.batch_size, steps, dim)
-            brownians_cv = (xb[1] * f_out * discounts).sum(-1).sum(-1)
-            var_loss = (yb + brownians_cv).var()
-            run_loss += var_loss.item()
-            var_loss.backward()
-            opt.step()
-        loss_arr.append(run_loss / len(dl))
-        if print_losses:
-            print('{}: Train loss: {:.5f}     95% confidence interval: {:.5f}'.format(epoch, loss_arr[epoch], np.sqrt(
-                loss_arr[epoch]) * 2 / np.sqrt(trials)))
-        model.eval()
-    end_train = time.time()
-    return end_train - start_train, loss_arr
+    run_sum, run_sum_sq = 0, 0
+    with torch.inference_mode():
+        for (paths, normals, jumps), payoffs in dl:
+            if f.sequential:
+                rep_time_points = time_points.unsqueeze(-1).repeat(dl.batch_size, 1, 1)
+                f_in = torch.cat([rep_time_points, paths], dim=-1)
+                g_in = torch.cat([rep_time_points, paths], dim=-1)
+            else:
+                rep_time_points = time_points.repeat(dl.batch_size).unsqueeze(-1)
+                f_in = torch.cat([rep_time_points, paths.reshape(dl.batch_size * steps, dim)], dim=-1)
+                g_in = torch.cat([rep_time_points, paths.reshape(dl.batch_size * steps, dim)], dim=-1)
+
+            f_out = f(f_in).view(dl.batch_size, steps, dim)
+            g_out = g(g_in).view(dl.batch_size, steps, dim)
+
+            brownians_cv = (normals * f_out * discounts).sum(-1).sum(-1)
+            jumps_cv = (jumps * g_out * discounts).sum(-1).sum(-1)
+            comps = (- solver.sde.jump_rate() * solver.sde.jump_mean() * g_out * discounts * h).sum(-1).sum(-1)
+
+            gammas = payoffs + brownians_cv + jumps_cv + comps
+            run_sum += gammas.sum()
+            run_sum_sq += (gammas * gammas).sum()
+    return run_sum, run_sum_sq
+
+
+# def apply_diffusion_control_variate(model, dl, time_points, Ys):
+#     n, steps, dim = dl.dataset.paths.shape
+#     run_sum = 0
+#     run_sum_sq = 0
+#     discounts = Ys.view(1, len(Ys), 1)
+#     rep_time_points = time_points.repeat(dl.batch_size).unsqueeze(-1)
+#
+#     with torch.no_grad():
+#         for xb, yb in dl:
+#             inputs = torch.cat([rep_time_points, xb[0].reshape(dl.batch_size * steps, dim)], dim=-1)
+#             f_out = model(inputs).view(dl.batch_size, steps, dim)
+#             brownians_cv = (xb[1] * f_out * discounts).sum(-1).sum(-1)
+#             gammas = (yb + brownians_cv)
+#             run_sum += gammas.sum()
+#             run_sum_sq += (gammas * gammas).sum()
+#     return run_sum, run_sum_sq
+#
+#
+# def apply_control_variates(models, dl, jump_mean, rate, time_points, Ys):
+#     f, g = models
+#     n, steps, dim = dl.dataset.paths.shape
+#     run_sum = 0
+#     run_sum_sq = 0
+#     h = time_points[1] - time_points[0]
+#     discounts = Ys.view(1, len(Ys), 1)
+#     rep_time_points = time_points.repeat(dl.batch_size).unsqueeze(-1)
+#
+#     with torch.no_grad():
+#         for xb, yb in dl:
+#             inputs = torch.cat([rep_time_points, xb[0].reshape(dl.batch_size * steps, dim)], dim=-1)
+#             g_out = g(inputs).view(dl.batch_size, steps, dim)
+#             f_out = f(inputs).view(dl.batch_size, steps, dim)
+#
+#             Zs = (xb[1] * f_out * discounts).sum(-1).sum(-1)
+#             Js = (xb[2] * g_out * discounts).sum(-1).sum(-1)
+#             comps = (- rate * jump_mean * g_out * discounts * h).sum(-1).sum(-1)
+#
+#             gammas = (yb + Js + comps + Zs)
+#             run_sum += gammas.sum()
+#             run_sum_sq += (gammas * gammas).sum()
+#
+#     return run_sum, run_sum_sq
+#
+#
+# def train_control_variates(models, opt, dl, jump_mean, rate, time_points, Ys, epochs, print_losses=True):
+#     f, g = models
+#     trials, steps, dim = dl.dataset.paths.shape
+#     rep_time_points = time_points.repeat(dl.batch_size).unsqueeze(-1)
+#     h = time_points[1] - time_points[0]
+#     loss_arr = []
+#     discounts = Ys.view(1, len(Ys), 1)
+#
+#     start_train = time.time()
+#     for epoch in range(epochs):
+#         f.train(); g.train()
+#         run_loss = 0
+#         for i, (xb, yb) in enumerate(dl):
+#             opt.zero_grad()
+#             f_in = torch.cat([rep_time_points, xb[0].reshape(dl.batch_size*steps, dim)], dim=-1)
+#             g_in = torch.cat([rep_time_points, xb[0].reshape(dl.batch_size*steps, dim)], dim=-1)
+#             f_out = f(f_in).view(dl.batch_size, steps, dim)
+#             g_out = g(g_in).view(dl.batch_size, steps, dim)
+#
+#             brownians_cv = (xb[1] * f_out * discounts).sum(-1).sum(-1)
+#             jumps_cv = (xb[2] * g_out * discounts).sum(-1).sum(-1)
+#             comps = (- rate * jump_mean * g_out * discounts * h).sum(-1).sum(-1)
+#
+#             var_loss = (yb + jumps_cv + comps + brownians_cv).var()
+#             run_loss += var_loss.item()
+#             var_loss.backward()
+#             opt.step()
+#         loss_arr.append(run_loss / len(dl))
+#         if print_losses:
+#             print('{}: Train loss: {:.5f}     95% confidence interval: {:.5f}'.format(epoch, loss_arr[epoch], np.sqrt(loss_arr[epoch])*2 / np.sqrt(trials)))
+#         f.eval(); g.eval()
+#     end_train = time.time()
+#     return end_train-start_train, loss_arr
+#
+#
+# def train_diffusion_control_variate(model, opt, dl, time_points, Ys, epochs, print_losses=True):
+#     trials, steps, dim = dl.dataset.paths.shape
+#     rep_time_points = time_points.repeat(dl.batch_size).unsqueeze(-1)
+#     loss_arr = []
+#     discounts = Ys.view(1, len(Ys), 1)
+#
+#     start_train = time.time()
+#     for epoch in range(epochs):
+#         model.train()
+#         run_loss = 0
+#         for i, (xb, yb) in enumerate(dl):
+#             opt.zero_grad()
+#             f_in = torch.cat([rep_time_points, xb[0].reshape(dl.batch_size * steps, dim)], dim=-1)
+#             f_out = model(f_in).view(dl.batch_size, steps, dim)
+#             brownians_cv = (xb[1] * f_out * discounts).sum(-1).sum(-1)
+#             var_loss = (yb + brownians_cv).var()
+#             run_loss += var_loss.item()
+#             var_loss.backward()
+#             opt.step()
+#         loss_arr.append(run_loss / len(dl))
+#         if print_losses:
+#             print('{}: Train loss: {:.5f}     95% confidence interval: {:.5f}'.format(epoch, loss_arr[epoch], np.sqrt(
+#                 loss_arr[epoch]) * 2 / np.sqrt(trials)))
+#         model.eval()
+#     end_train = time.time()
+#     return end_train - start_train, loss_arr
 
 
 def apply_adapted_control_variates(models, dl, discounter, rate, jump_mean):

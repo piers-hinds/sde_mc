@@ -164,35 +164,22 @@ def mc_control_variates(models, opt, solver, trials, steps, payoff, discounter, 
         The relevant MC statistics
     """
     # Config
-    jump_mean = solver.sde.jump_mean()
-    rate = solver.sde.jump_rate()
     train_trials, test_trials = trials
     train_steps, test_steps = steps
     train_bs, test_bs = bs
     train_sim_bs, test_sim_bs = sim_bs
     solver.num_steps = train_steps
 
-    train_time_points = partition(solver.time_interval, train_steps, ends='left', device=solver.device)
-    test_time_points = partition(solver.time_interval, test_steps, ends='left', device=solver.device)
-    train_ys, test_ys = discounter(train_time_points), discounter(test_time_points)
-
     # Training
     train_start = time.time()
-    if not no_train:
-        train_dataloader = simulate_data(train_trials, solver, payoff, discounter, bs=train_bs)
-        if solver.has_jumps:
-            _, losses = train_control_variates(models, opt, train_dataloader, jump_mean, rate, train_time_points,
-                                               train_ys, epochs, print_losses)
-        else:
-            _, losses = train_diffusion_control_variate(models, opt, train_dataloader, train_time_points, train_ys, epochs,
-                                                        print_losses)
+    sim_train_control_variates(models, opt, solver, train_trials, payoff, discounter, train_sim_bs, train_bs, epochs)
     train_end = time.time()
-    train_time = train_end - train_start
 
     # Inference
     solver.num_steps = test_steps
     mc_stats = mc_apply_cvs(models, solver, test_trials, payoff, discounter, test_sim_bs, test_bs)
-    mc_stats.time_elapsed += train_time
+    mc_stats.time_elapsed += train_end - train_start
+
     return mc_stats
 
 
@@ -224,18 +211,17 @@ def mc_apply_cvs(models, solver, trials, payoff, discounter, sim_bs=1e5, bs=1000
         The relevant stats from the MC simulation
     """
     start_test = time.time()
-    time_points = partition(solver.time_interval, solver.num_steps, ends='left', device=solver.device)
-    ys = discounter(time_points)
+
     run_sum, run_sum_sq = 0, 0
     trials_remaining = trials
     while trials_remaining > 0:
         batch_size = min(sim_bs, trials_remaining)
         trials_remaining -= batch_size
-        test_dataloader = simulate_data(batch_size, solver, payoff, discounter, bs=bs, inference=True)
+        test_dl = simulate_data(batch_size, solver, payoff, discounter, bs=bs, inference=True)
         if solver.has_jumps:
-            x, y = apply_control_variates(models, test_dataloader, solver.sde.jump_mean(), solver.sde.jump_rate(), time_points, ys)
+            x, y = apply_control_variates(models, test_dl, solver, discounter)
         else:
-            x, y = apply_diffusion_control_variate(models, test_dataloader, time_points, ys)
+            x, y = apply_diffusion_control_variate(models, test_dl, solver, discounter)
         run_sum += x
         run_sum_sq += y
 
@@ -419,6 +405,15 @@ def simulate_adapted_data(trials, solver, payoff, discounter, bs=1000, inference
         payoffs = mc_stats.payoffs
         dset = AdaptedPathData(paths, payoffs, normals, jumps, jump_times, left_paths, time_paths, total_steps, jump_paths)
     return DataLoader(dset, batch_size=bs, shuffle=not inference, drop_last=not inference)
+
+
+def sim_train_control_variates(models, opt, solver, trials, payoff, discounter, sim_bs, bs, epochs=10,
+                               print_losses=True):
+    train_dl = simulate_data(trials, solver, payoff, discounter, bs=bs)
+    if solver.has_jumps:
+        _, losses = train_control_variates(models, opt, train_dl, solver, discounter, epochs, print_losses)
+    else:
+        _, losses = train_diffusion_control_variate(models, opt, train_dl, solver, discounter, epochs, print_losses)
 
 
 def get_optimal_trials(trials, levels, epsilon, solver, payoff, discounter):
