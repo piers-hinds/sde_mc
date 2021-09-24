@@ -218,7 +218,7 @@ class JumpAdaptedSolver(SdeSolver):
             # increment jump index if a jump has just happened
             jump_idxs = torch.where(torch.isclose(next_jump_time, t), jump_idxs + 1, jump_idxs)
 
-        return paths, (normals, jumps, jump_times, time_paths, left_paths, total_steps, jump_paths)
+        return paths, (normals, time_paths, left_paths, total_steps, jump_paths)
 
     def step_diffusion(self, t, x, h):
         corr_normals = self.sample_corr_normals(x.shape + torch.Size([1]), h.unsqueeze(-1))

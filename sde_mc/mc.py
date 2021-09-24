@@ -81,7 +81,7 @@ def mc_simple(num_trials, sde_solver, payoff, discounter=None, bs=None, return_n
         start = time.time()
         out, normals = sde_solver.solve(bs=num_trials, return_normals=return_normals)
         if payoff_time == 'adapted':
-            payoff_index = normals[5]
+            payoff_index = normals[3]
         spots = out[:, payoff_index]
         payoffs = payoff(spots) * discounter(sde_solver.time_interval)
 
@@ -401,9 +401,9 @@ def simulate_data(trials, solver, payoff, discounter, bs=1000, inference=False):
 def simulate_adapted_data(trials, solver, payoff, discounter, bs=1000, inference=False):
     mc_stats = mc_simple(trials, solver, payoff, discounter, return_normals=True, payoff_time='adapted')
     if solver.has_jumps:
-        paths, (normals, jumps, jump_times, time_paths, left_paths, jump_paths, total_steps) = mc_stats.paths, mc_stats.normals
+        paths, (normals, time_paths, left_paths, jump_paths, total_steps) = mc_stats.paths, mc_stats.normals
         payoffs = mc_stats.payoffs
-        dset = AdaptedPathData(paths, payoffs, normals, jumps, jump_times, left_paths, time_paths, total_steps, jump_paths)
+        dset = AdaptedPathData(paths, payoffs, normals, left_paths, time_paths, total_steps, jump_paths)
     return DataLoader(dset, batch_size=bs, shuffle=not inference, drop_last=not inference)
 
 
