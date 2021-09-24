@@ -139,21 +139,27 @@ def apply_control_variates(models, dl, solver, discounter):
 
 def apply_adapted_control_variates(models, dl, solver, discounter):
     n, steps, dim = dl.dataset.paths.shape
-    total_steps = dl.dataset.total_steps
     f, g = models
     run_sum, run_sum_sq = 0, 0
     with torch.no_grad():
         for (paths, normals, left_paths, time_paths, jump_paths), payoffs in dl:
             h = torch.diff(time_paths, dim=1)
             discounts = discounter(time_paths)
-            time_inputs = time_paths.reshape(dl.batch_size * steps, dim)
-            paths_inputs = paths.reshape(dl.batch_size * steps, dim)
+            if f.sequential:
+                f_inputs = torch.cat([time_paths, paths], dim=-1)
+            else:
+                time_inputs = time_paths.reshape(dl.batch_size * steps, dim)
+                paths_inputs = paths.reshape(dl.batch_size * steps, dim)
+                f_inputs = torch.cat([time_inputs, paths_inputs], dim=-1)
 
-            f_inputs = torch.cat([time_inputs, paths_inputs], dim=-1)
             f_outputs = f(f_inputs).view(dl.batch_size, steps, dim)
             brownian_cv = (normals * f_outputs).sum(-1).sum(-1)
 
-            g_inputs = torch.cat([time_inputs, left_paths.view(dl.batch_size * steps, dim)], dim=-1)
+            if g.sequential:
+                g_inputs = torch.cat([time_paths, left_paths], dim=-1)
+            else:
+                time_inputs = time_paths.reshape(dl.batch_size * steps, dim)
+                g_inputs = torch.cat([time_inputs, left_paths.view(dl.batch_size * steps, dim)], dim=-1)
             g_outputs = g(g_inputs).view(dl.batch_size, steps, dim)
             jump_cv = (g_outputs * discounts * jump_paths).sum(-1).sum(-1)
 
@@ -178,14 +184,23 @@ def train_adapted_control_variates(models, opt, dl, solver, discounter, epochs=1
             h = torch.diff(time_paths, dim=1)
             discounts = discounter(time_paths)
 
-            time_inputs = time_paths.reshape(dl.batch_size * steps, dim)
-            paths_inputs = paths.reshape(dl.batch_size * steps, dim)
+            if f.sequential:
+                f_inputs = torch.cat([time_paths, paths], dim=-1)
+            else:
+                time_inputs = time_paths.reshape(dl.batch_size * steps, dim)
+                paths_inputs = paths.reshape(dl.batch_size * steps, dim)
+                f_inputs = torch.cat([time_inputs, paths_inputs], dim=-1)
 
-            f_inputs = torch.cat([time_inputs, paths_inputs], dim=-1)
             f_outputs = f(f_inputs).view(dl.batch_size, steps, dim)
             brownian_cv = (normals * f_outputs).sum(-1).sum(-1)
 
-            g_inputs = torch.cat([time_inputs, left_paths.view(dl.batch_size * steps, dim)], dim=-1)
+            if g.sequential:
+                g_inputs = torch.cat([time_paths, left_paths], dim=-1)
+            else:
+                time_inputs = time_paths.reshape(dl.batch_size * steps, dim)
+                paths_inputs = paths.reshape(dl.batch_size * steps, dim)
+                g_inputs = torch.cat([time_inputs, left_paths.view(dl.batch_size * steps, dim)], dim=-1)
+
             g_outputs = g(g_inputs).view(dl.batch_size, steps, dim)
             jump_cv = (g_outputs * discounts * jump_paths).sum(-1).sum(-1)
 
