@@ -221,7 +221,7 @@ class JumpAdaptedSolver(SdeSolver):
         return paths, (normals, jumps, jump_times, time_paths, left_paths, total_steps, jump_paths)
 
     def step_diffusion(self, t, x, h):
-        corr_normals = self.sample_corr_normals(x.shape + torch.Size([1]), h)
+        corr_normals = self.sample_corr_normals(x.shape + torch.Size([1]), h.unsqueeze(-1))
         return x + self.sde.drift(t, x) * h + self.sde.diffusion(t, x) * corr_normals, corr_normals
 
     def add_jumps(self, t, x, jumps):

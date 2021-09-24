@@ -42,3 +42,13 @@ def test_simulate_data(gbm_2d_solver):
 
 def test_simulate_data_jumps(merton_1d_solver):
     dl = simulate_data(16, merton_1d_solver, EuroCall(1), ConstantShortRate(0.02), bs=16)
+
+
+def test_simulate_adapted(merton_1d_adapted_solver, euro_call, constant_short_rate):
+    dl = simulate_adapted_data(16, merton_1d_adapted_solver, euro_call, constant_short_rate, bs=8)
+
+
+def test_mc_adaptive_cv(merton_1d_adapted_solver, mlps_1d, euro_call, constant_short_rate):
+    adam = torch.optim.Adam(list(mlps_1d[0].parameters()) + list(mlps_1d[1].parameters()))
+    mc_stats = mc_adaptive_cv(mlps_1d, adam, merton_1d_adapted_solver, (100, 100), (10, 20), euro_call,
+                              constant_short_rate, sim_bs=(100, 100), bs=(10, 10), print_losses=False)

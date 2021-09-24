@@ -55,6 +55,11 @@ def merton_2d_solver(merton_2d):
 
 
 @pytest.fixture
+def merton_1d_adapted_solver(merton_1d):
+    return JumpAdaptedSolver(merton_1d, 3, 10)
+
+
+@pytest.fixture
 def terminals_1d():
     return torch.tensor([[1.], [3.], [0.5], [0.]])
 
@@ -82,6 +87,11 @@ def sample_dataloader(gbm_1d_solver, euro_call, constant_short_rate):
 @pytest.fixture
 def sample_jumps_dataloader(merton_1d_solver, euro_call, constant_short_rate):
     return simulate_data(10, merton_1d_solver, euro_call, constant_short_rate, bs=2)
+
+
+@pytest.fixture
+def sample_adapted_dataloader(merton_1d_adapted_solver, euro_call, constant_short_rate):
+    return simulate_adapted_data(10, merton_1d_adapted_solver, euro_call, constant_short_rate, bs=2)
 
 
 @pytest.fixture

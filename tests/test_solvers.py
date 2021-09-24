@@ -28,3 +28,14 @@ def test_multilevel_euler(gbm_1d_solver):
     levels = [4, 8]
     (paths_fine, paths_coarse), norms = gbm_1d_solver.multilevel_euler(bs=4, levels=levels, return_normals=True)
 
+
+def test_adapted_solver(merton_1d_adapted_solver):
+    paths, (normals, jumps, jump_times, time_paths, left_paths, total_steps, jump_paths) = merton_1d_adapted_solver.solve(8)
+    assert not torch.isnan(paths).any()
+    assert not torch.isnan(normals).any()
+    assert not torch.isnan(jumps).any()
+    assert not torch.isnan(jump_times).any()
+    assert not torch.isnan(time_paths).any()
+    assert not torch.isnan(left_paths).any()
+    assert not torch.isnan(jump_paths).any()
+
