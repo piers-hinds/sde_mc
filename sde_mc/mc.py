@@ -403,7 +403,8 @@ def simulate_adapted_data(trials, solver, payoff, discounter, bs=1000, inference
     if solver.has_jumps:
         paths, (normals, time_paths, left_paths, total_steps, jump_paths) = mc_stats.paths, mc_stats.normals
         payoffs = mc_stats.payoffs
-        dset = AdaptedPathData(paths, payoffs, normals, left_paths, time_paths, jump_paths, total_steps)
+        dset = AdaptedPathData(paths[:, :total_steps+1], payoffs, normals[:, :total_steps], left_paths[:, :total_steps+1],
+                                       time_paths[:, :total_steps+1], jump_paths[:, :total_steps+1], total_steps)
     return DataLoader(dset, batch_size=bs, shuffle=not inference, drop_last=not inference)
 
 
