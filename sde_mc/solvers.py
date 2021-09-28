@@ -171,7 +171,7 @@ class JumpAdaptedSolver(SdeSolver):
         # at most there will be num_steps + MAX_JUMPS + 1 number of observations
         paths = torch.zeros(size=(bs, self.num_steps + self.MAX_JUMPS + 1, self.sde.dim), device=self.device)
         left_paths = torch.zeros_like(paths)
-        time_paths = torch.zeros_like(paths) + self.time_interval
+        time_paths = torch.zeros(size=(bs, self.num_steps + self.MAX_JUMPS + 1, 1), device=self.device) + self.time_interval
         x = self.sde.init_value.unsqueeze(0).repeat(bs, 1).to(self.device)
         paths[:, 0] = x
         left_paths[:, 0] = x
