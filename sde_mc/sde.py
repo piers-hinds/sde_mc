@@ -149,7 +149,10 @@ class LogNormalJumpsSde(Sde):
         :param corr_matrix: torch.tensor, the correlation matrix
         """
         super(LogNormalJumpsSde, self).__init__(init_value, dim, corr_matrix, method)
-        self.rate = torch.tensor(rate)
+        if torch.is_tensor(rate):
+            self.rate = rate
+        else:
+            self.rate = torch.tensor(rate)
         self.alpha = alpha
         self.gamma = gamma
 
