@@ -87,7 +87,7 @@ class DiffusionSde(Sde):
         return None
 
     def jump_rate(self):
-        return 0
+        return torch.tensor(0)
 
 
 class Gbm(DiffusionSde):

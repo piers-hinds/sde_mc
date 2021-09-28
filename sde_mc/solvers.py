@@ -27,7 +27,7 @@ class SdeSolver:
         self.time_interval = time_interval
         self.num_steps = num_steps
         self.device = device
-        self.has_jumps = bool(self.sde.jump_rate())
+        self.has_jumps = self.sde.jump_rate().any()
 
         if len(self.sde.corr_matrix) > 1:
             self.lower_cholesky = torch.linalg.cholesky(self.sde.corr_matrix.to(device))
