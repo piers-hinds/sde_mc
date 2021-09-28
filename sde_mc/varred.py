@@ -148,7 +148,7 @@ def apply_adapted_control_variates(models, dl, solver, discounter):
             if f.sequential:
                 f_inputs = torch.cat([time_paths, paths], dim=-1)
             else:
-                time_inputs = time_paths.reshape(dl.batch_size * steps, dim)
+                time_inputs = time_paths.reshape(dl.batch_size * steps, 1)
                 paths_inputs = paths.reshape(dl.batch_size * steps, dim)
                 f_inputs = torch.cat([time_inputs, paths_inputs], dim=-1)
 
@@ -158,7 +158,7 @@ def apply_adapted_control_variates(models, dl, solver, discounter):
             if g.sequential:
                 g_inputs = torch.cat([time_paths, left_paths], dim=-1)
             else:
-                time_inputs = time_paths.reshape(dl.batch_size * steps, dim)
+                time_inputs = time_paths.reshape(dl.batch_size * steps, 1)
                 g_inputs = torch.cat([time_inputs, left_paths.view(dl.batch_size * steps, dim)], dim=-1)
             g_outputs = g(g_inputs).view(dl.batch_size, steps, dim)
             jump_cv = (g_outputs * discounts * jump_paths).sum(-1).sum(-1)
@@ -183,11 +183,10 @@ def train_adapted_control_variates(models, opt, dl, solver, discounter, epochs=1
 
             h = torch.diff(time_paths, dim=1)
             discounts = discounter(time_paths)
-
             if f.sequential:
                 f_inputs = torch.cat([time_paths, paths], dim=-1)
             else:
-                time_inputs = time_paths.reshape(dl.batch_size * steps, dim)
+                time_inputs = time_paths.reshape(dl.batch_size * steps, 1)
                 paths_inputs = paths.reshape(dl.batch_size * steps, dim)
                 f_inputs = torch.cat([time_inputs, paths_inputs], dim=-1)
 
@@ -197,7 +196,7 @@ def train_adapted_control_variates(models, opt, dl, solver, discounter, epochs=1
             if g.sequential:
                 g_inputs = torch.cat([time_paths, left_paths], dim=-1)
             else:
-                time_inputs = time_paths.reshape(dl.batch_size * steps, dim)
+                time_inputs = time_paths.reshape(dl.batch_size * steps, 1)
                 paths_inputs = paths.reshape(dl.batch_size * steps, dim)
                 g_inputs = torch.cat([time_inputs, left_paths.view(dl.batch_size * steps, dim)], dim=-1)
 
