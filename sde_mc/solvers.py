@@ -1,4 +1,5 @@
 import torch
+import torch.nn.functional as F
 from abc import ABC, abstractmethod
 from .helpers import solve_quadratic
 
@@ -161,7 +162,7 @@ class SdeSolver:
 class JumpAdaptedSolver(SdeSolver):
     def __init__(self, sde, time_interval, num_steps, device='cpu', seed=1):
         super(JumpAdaptedSolver, self).__init__(sde, time_interval, num_steps, device, seed)
-        self.MAX_JUMPS = max(int(self.time_interval * self.sde.jump_rate() * 10), 5)
+        self.MAX_JUMPS = max(int(self.time_interval * self.sde.jump_rate().sum() * 10), 5)
 
     def euler(self, bs, return_normals=False):
         bs = int(bs)
@@ -179,12 +180,10 @@ class JumpAdaptedSolver(SdeSolver):
 
         # storage for normals
         normals = torch.zeros(size=(bs, self.num_steps + self.MAX_JUMPS, self.sde.dim), device=self.device)
-        # storage fo jump paths
+        # storage for jump paths
         jump_paths = torch.zeros_like(paths)
 
-        jump_times = self.sample_jump_times(size=(bs, self.MAX_JUMPS, self.sde.dim))
-        jumps = self.sample_jumps(size=(bs, self.MAX_JUMPS, self.sde.dim))
-
+        jump_times = self.sample_jump_times(size=(bs, self.MAX_JUMPS, 1))
         jump_idxs = torch.zeros_like(jump_times[:, 0, :]).long()
 
         total_steps = 0
@@ -194,7 +193,6 @@ class JumpAdaptedSolver(SdeSolver):
 
             # times and sizes of the next jump
             next_jump_time = jump_times[torch.arange(bs), jump_idxs.squeeze(-1), :]
-            next_jump_size = jumps[torch.arange(bs), jump_idxs.squeeze(-1), :]
 
             # time step is minimum of (mesh size, time to next jump, time to end of interval)
             h = torch.minimum(h, torch.maximum(self.time_interval - t, torch.tensor(0.)))
@@ -207,6 +205,7 @@ class JumpAdaptedSolver(SdeSolver):
             time_paths[:, total_steps] = t
 
             # add jumps if the next jump is now - could sample jumps here if storage issues
+            next_jump_size = self.sample_one_jump(bs)
             current_jumps = torch.where(torch.isclose(next_jump_time, t), next_jump_size,
                                         torch.zeros_like(next_jump_size))
             jump_paths[:, total_steps] = current_jumps
@@ -228,7 +227,13 @@ class JumpAdaptedSolver(SdeSolver):
         return self.sde.jumps(t, x, jumps)
 
     def sample_jump_times(self, size):
-        return torch.empty(size, device=self.device).exponential_(self.sde.jump_rate()).cumsum(dim=1)
+        return torch.empty(size, device=self.device).exponential_(self.sde.jump_rate().sum()).cumsum(dim=1)
+
+    def sample_one_jump(self, size):
+        jumps = self.sde.sample_jumps([size, self.sde.dim], self.device)
+        # Following line can be changed when rates are not all equal, use torch.Categorical
+        rand_dim = torch.randint(0, self.sde.dim, (size,), device=self.device)
+        return F.one_hot(rand_dim, num_classes=self.sde.dim) * jumps
 
 
 class Grid(ABC):
