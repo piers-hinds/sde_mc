@@ -127,6 +127,40 @@ class Lstm(ControlVariate):
                                                                                       device=self.device)
 
 
+class Gru(ControlVariate):
+    """Gated Recurrent Unit (GRU)"""
+
+    def __init__(self, in_dim, hidden_dim, out_dim, device='cpu'):
+        """
+        :param in_dim: int
+            The dimension of the input data
+
+        :param hidden_dim: int
+            The dimension of the hidden state
+
+        :param out_dim: int
+            The dimension of the output
+
+        :param device: str (default = 'cpu')
+            The device to store the model on
+        """
+        super(Gru, self).__init__(sequential=True, device=device)
+        self.in_dim = in_dim
+        self.hidden_dim = hidden_dim
+        self.out_dim = out_dim
+        self.gru = nn.GRU(in_dim, hidden_dim, batch_first=True).to(device)
+        self.lin = nn.Linear(hidden_dim, out_dim).to(device)
+
+    def forward(self, x):
+        h = self.init_hidden(x.shape[0])
+        out, h = self.gru(x, h)
+        out = self.lin(out)
+        return out
+
+    def init_hidden(self, bs):
+        return torch.zeros((1, bs, self.hidden_dim), device=self.device)
+
+
 class NormalPathData(Dataset):
     def __init__(self, paths, payoffs, normals):
         self.paths = paths[:, :-1]
