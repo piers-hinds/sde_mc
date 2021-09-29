@@ -1,7 +1,15 @@
+import torch
+
 from .test_simple import *
 
 
 # nets.py
+def test_zero_function():
+    f = ZeroFunction(26)
+    x = torch.randn((12, 15))
+    assert torch.allclose(f(x), torch.zeros((12, 26)))
+
+
 def test_lstm():
     x = torch.tensor([[[1., 2.], [3., 4.]]])
     lstm = Lstm(2, 20, 1)

@@ -19,6 +19,22 @@ class ControlVariate(nn.Module):
         self.device = device
 
 
+class ZeroFunction(ControlVariate):
+    """A control variate that maps any input to zero"""
+
+    def __init__(self, output_dim):
+        """
+        :param output_dim: int
+            The dimension of the output. The shape of the output will be (bs, output_dim)
+        """
+        super(ZeroFunction, self).__init__(sequential=False, device=None)
+        self.output_dim = output_dim
+
+    def forward(self, x):
+        bs = x.shape[0]
+        return torch.zeros((bs, self.output_dim), device=x.device)
+
+
 class Mlp(ControlVariate):
     """Multilayer perceptron (MLP)"""
 
