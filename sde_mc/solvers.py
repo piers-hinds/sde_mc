@@ -171,7 +171,8 @@ class JumpAdaptedSolver(SdeSolver):
         # at most there will be num_steps + MAX_JUMPS + 1 number of observations
         paths = torch.zeros(size=(bs, self.num_steps + self.MAX_JUMPS + 1, self.sde.dim), device=self.device)
         left_paths = torch.zeros_like(paths)
-        time_paths = torch.zeros(size=(bs, self.num_steps + self.MAX_JUMPS + 1, 1), device=self.device) + self.time_interval
+        time_paths = torch.zeros(size=(bs, self.num_steps + self.MAX_JUMPS + 1, 1),
+                                 device=self.device) + self.time_interval
         x = self.sde.init_value.unsqueeze(0).repeat(bs, 1).to(self.device)
         paths[:, 0] = x
         left_paths[:, 0] = x
@@ -197,7 +198,7 @@ class JumpAdaptedSolver(SdeSolver):
             # time step is minimum of (mesh size, time to next jump, time to end of interval)
             h = torch.minimum(h, torch.maximum(self.time_interval - t, torch.tensor(0.)))
             dt = torch.minimum(h, next_jump_time - t)
-            assert (next_jump_time > t).all()
+            assert (next_jump_time >= t).all()
             # step diffusion until the next time step
             x, normals[:, total_steps - 1] = self.step_diffusion(t, x, dt)
             left_paths[:, total_steps] = x
@@ -206,7 +207,7 @@ class JumpAdaptedSolver(SdeSolver):
 
             # add jumps if the next jump is now - could sample jumps here if storage issues
             next_jump_size = self.sample_one_jump(bs)
-            current_jumps = torch.where(torch.isclose(next_jump_time, t), next_jump_size,
+            current_jumps = torch.where(torch.isclose(next_jump_time, t, atol=1e-12), next_jump_size,
                                         torch.zeros_like(next_jump_size))
             jump_paths[:, total_steps] = current_jumps
             x += self.add_jumps(t, x, current_jumps)
@@ -215,7 +216,7 @@ class JumpAdaptedSolver(SdeSolver):
             paths[:, total_steps] = x
 
             # increment jump index if a jump has just happened
-            jump_idxs = torch.where(torch.isclose(next_jump_time, t), jump_idxs + 1, jump_idxs)
+            jump_idxs = torch.where(torch.isclose(next_jump_time, t, atol=1e-12), jump_idxs + 1, jump_idxs)
 
         return paths, (normals, time_paths, left_paths, total_steps, jump_paths)
 
