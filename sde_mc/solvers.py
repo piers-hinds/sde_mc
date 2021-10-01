@@ -16,7 +16,7 @@ class SdeSolver:
             The time to solve up to
 
         :param num_steps: int
-            The number of steps in the discretization
+            The number of steps in the discretisation
 
         :param device: string
             The device to do the computations on (default 'cpu')

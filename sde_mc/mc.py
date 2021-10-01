@@ -102,7 +102,7 @@ def mc_simple(num_trials, sde_solver, payoff, discounter=None, bs=None, return_n
             remaining_trials -= bs
             out, normals = sde_solver.solve(bs=bs, return_normals=False)
             if payoff_time == 'adapted':
-                payoff_index = normals[5]
+                payoff_index = normals[3]
             spots = out[:, payoff_index]
             payoffs = payoff(spots) * discounter(sde_solver.time_interval)
 
