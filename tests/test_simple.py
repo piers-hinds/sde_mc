@@ -31,32 +31,27 @@ def merton_2d():
 
 @pytest.fixture
 def gbm_1d_solver(gbm_1d):
-    return SdeSolver(gbm_1d, 3, 10)
+    return EulerSolver(gbm_1d, 3, 10)
 
 
 @pytest.fixture
 def gbm_2d_solver(gbm_2d):
-    return SdeSolver(gbm_2d, 3, 10)
+    return EulerSolver(gbm_2d, 3, 10)
 
 
 @pytest.fixture
 def heston_1d_solver(heston_1d):
-    return SdeSolver(heston_1d, 3, 10)
+    return HestonSolver(heston_1d, 3, 10)
 
 
 @pytest.fixture
 def merton_1d_solver(merton_1d):
-    return SdeSolver(merton_1d, 3, 10)
+    return JumpEulerSolver(merton_1d, 3, 10)
 
 
 @pytest.fixture
 def merton_2d_solver(merton_2d):
-    return SdeSolver(merton_2d, 3, 10)
-
-
-@pytest.fixture
-def merton_1d_adapted_solver(merton_1d):
-    return JumpAdaptedSolver(merton_1d, 3, 10)
+    return JumpEulerSolver(merton_2d, 3, 10)
 
 
 @pytest.fixture
@@ -90,8 +85,8 @@ def sample_jumps_dataloader(merton_1d_solver, euro_call, constant_short_rate):
 
 
 @pytest.fixture
-def sample_adapted_dataloader(merton_1d_adapted_solver, euro_call, constant_short_rate):
-    return simulate_adapted_data(10, merton_1d_adapted_solver, euro_call, constant_short_rate, bs=2)
+def sample_adapted_dataloader(merton_1d_solver, euro_call, constant_short_rate):
+    return simulate_adapted_data(10, merton_1d_solver, euro_call, constant_short_rate, bs=2)
 
 
 @pytest.fixture

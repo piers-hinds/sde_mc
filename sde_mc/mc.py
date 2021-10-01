@@ -387,14 +387,9 @@ def simulate_data(trials, solver, payoff, discounter, bs=1000, inference=False):
     if inference:
         assert not trials % bs, 'Batch size should partition total trials evenly'
     mc_stats = mc_simple(trials, solver, payoff, discounter, return_normals=True)
-    if solver.has_jumps:
-        paths, (normals, jumps) = mc_stats.paths, mc_stats.normals
-        payoffs = mc_stats.payoffs
-        dset = NormalJumpsPathData(paths, payoffs, normals, jumps)
-    else:
-        paths, (normals, _) = mc_stats.paths, mc_stats.normals
-        payoffs = mc_stats.payoffs
-        dset = NormalPathData(paths, payoffs, normals)
+    paths, normals = mc_stats.paths, mc_stats.normals
+    payoffs = mc_stats.payoffs
+    dset = NormalPathData(paths, payoffs, normals)
     return DataLoader(dset, batch_size=bs, shuffle=not inference, drop_last=not inference)
 
 
