@@ -2,8 +2,8 @@ import time
 import numpy as np
 import torch
 from torch.utils.data import DataLoader
-from .varred import train_control_variates, apply_control_variates, train_diffusion_control_variate, \
-    apply_diffusion_control_variate, train_adapted_control_variates, apply_adapted_control_variates
+from .varred import train_diffusion_control_variate, apply_diffusion_control_variate, train_adapted_control_variates, \
+    apply_adapted_control_variates
 from .nets import NormalJumpsPathData, NormalPathData, AdaptedPathData
 from .helpers import partition, mc_estimates
 from .options import ConstantShortRate
@@ -163,6 +163,7 @@ def mc_control_variates(models, opt, solver, trials, steps, payoff, discounter, 
     :return: MCStatistics
         The relevant MC statistics
     """
+    assert not solver.has_jumps
     # Config
     train_trials, test_trials = trials
     train_steps, test_steps = steps
@@ -218,10 +219,7 @@ def mc_apply_cvs(models, solver, trials, payoff, discounter, sim_bs=1e5, bs=1000
         batch_size = min(sim_bs, trials_remaining)
         trials_remaining -= batch_size
         test_dl = simulate_data(batch_size, solver, payoff, discounter, bs=bs, inference=True)
-        if solver.has_jumps:
-            x, y = apply_control_variates(models, test_dl, solver, discounter)
-        else:
-            x, y = apply_diffusion_control_variate(models, test_dl, solver, discounter)
+        x, y = apply_diffusion_control_variate(models, test_dl, solver, discounter)
         run_sum += x
         run_sum_sq += y
 
@@ -406,10 +404,7 @@ def simulate_adapted_data(trials, solver, payoff, discounter, bs=1000, inference
 def sim_train_control_variates(models, opt, solver, trials, payoff, discounter, sim_bs, bs, epochs=10,
                                print_losses=True):
     train_dl = simulate_data(trials, solver, payoff, discounter, bs=bs)
-    if solver.has_jumps:
-        _, losses = train_control_variates(models, opt, train_dl, solver, discounter, epochs, print_losses)
-    else:
-        _, losses = train_diffusion_control_variate(models, opt, train_dl, solver, discounter, epochs, print_losses)
+    _, losses = train_diffusion_control_variate(models, opt, train_dl, solver, discounter, epochs, print_losses)
 
 
 def get_optimal_trials(trials, levels, epsilon, solver, payoff, discounter):
