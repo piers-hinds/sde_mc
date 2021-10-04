@@ -205,6 +205,42 @@ class Gbm(DiffusionSde):
 
     def diffusion(self, t, x):
         return self.sigma * x
+
+
+class DoubleGbm(DiffusionSde):
+    """Geometric Brownian motion driven by two independent d-dimensional Brownian motions, used for testing the
+    'indep' method for solving"""
+
+    def __init__(self, mu, sigma1, sigma2, init_value, dim, corr_matrix=None, method='euler'):
+        """
+        :param mu: torch.tensor
+            The drifts of the process
+
+        :param sigma1: torch.tensor
+            The volatilities for the first Brownian motion
+
+        :param sigma2: torch.tensor
+            The volatilities for the second Brownian motion
+
+        :param init_value: torch.tensor
+            The initial value of the process
+
+        :param dim: torch.tensor
+            The dimension of the GBM
+
+        :param corr_matrix: torch.tensor
+            The correlation matrix
+        """
+        super(DoubleGbm, self).__init__(init_value, dim, dim*2, 'indep', corr_matrix, method)
+        self.mu = mu
+        self.sigma1 = sigma1
+        self.sigma2 = sigma2
+
+    def drift(self, t, x):
+        return self.mu * x
+
+    def diffusion(self, t, x):
+        return torch.stack([self.sigma1 * x, self.sigma2 * x], dim=-1)
     
 
 class Heston(DiffusionSde):

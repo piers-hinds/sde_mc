@@ -44,7 +44,7 @@ class SdeSolver(ABC):
         pass
 
     @abstractmethod
-    def step(self, t, x, h):
+    def step(self, t, x, h, corr_normals):
         pass
 
     def sample_corr_normals(self, size, h):
@@ -72,6 +72,9 @@ class DiffusionSolver(SdeSolver):
 
         if self.sde.diffusion_struct == 'diag':
             corr_normals = self.sample_corr_normals(size=(bs, self.num_steps, self.sde.dim, 1), h=h)
+        if self.sde.diffusion_struct == 'indep':
+            corr_normals = self.sample_corr_normals(size=(bs, self.num_steps, self.sde.dim, int(self.sde.brown_dim /
+                                                          self.sde.dim)), h=h)
 
         for i in range(self.num_steps):
             x = self.step(t, x, h, corr_normals[:, i])
