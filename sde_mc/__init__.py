@@ -6,3 +6,4 @@ from .options import *
 from .nets import *
 from .helpers import *
 from .solvers import *
+from .levy import *
