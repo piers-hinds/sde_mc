@@ -1,5 +1,7 @@
 import torch
-
+import numpy as np
+from abc import abstractmethod
+from .sde import Sde
 
 class InverseCdf:
     def __init__(self, c_minus, c_plus, mu, alpha, epsilon):
@@ -44,11 +46,11 @@ class Levy:
         pass
 
     @abstractmethod
-    def gamma():
+    def gamma(self):
         pass
 
     @abstractmethod
-    def beta():
+    def beta(self):
         pass
 
 
