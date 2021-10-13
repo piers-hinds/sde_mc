@@ -78,8 +78,11 @@ def apply_adapted_control_variates(models, dl, solver, discounter):
                 paths_inputs = paths.reshape(dl.batch_size * steps, dim)
                 f_inputs = torch.cat([time_inputs, paths_inputs], dim=-1)
 
-            f_outputs = f(f_inputs).view(dl.batch_size, steps, dim)
-            brownian_cv = (normals * f_outputs).sum(-1).sum(-1)
+            f_outputs = f(f_inputs).view(normals.shape)
+            if solver.sde.diffusion_struct == 'diag':
+                brownian_cv = (normals * f_outputs).sum(-1).sum(-1)
+            else:
+                brownian_cv = (normals * f_outputs).sum(-1).sum(-1).sum(-1)
 
             if g.sequential:
                 g_inputs = torch.cat([time_paths, left_paths], dim=-1)
@@ -116,8 +119,11 @@ def train_adapted_control_variates(models, opt, dl, solver, discounter, epochs=1
                 paths_inputs = paths.reshape(dl.batch_size * steps, dim)
                 f_inputs = torch.cat([time_inputs, paths_inputs], dim=-1)
 
-            f_outputs = f(f_inputs).view(dl.batch_size, steps, dim)
-            brownian_cv = (normals * f_outputs).sum(-1).sum(-1)
+            f_outputs = f(f_inputs).view(normals.shape)
+            if solver.sde.diffusion_struct == 'diag':
+                brownian_cv = (normals * f_outputs).sum(-1).sum(-1)
+            else:
+                brownian_cv = (normals * f_outputs).sum(-1).sum(-1).sum(-1)
 
             if g.sequential:
                 g_inputs = torch.cat([time_paths, left_paths], dim=-1)
