@@ -56,6 +56,10 @@ class Levy:
     def beta(self):
         pass
 
+    @abstractmethod
+    def jump_mean(self):
+        pass
+    
 
 class LevySde(Sde):
     """An Sde interface for a Levy-driven SDE which approximates small jumps with an additional diffusion
@@ -84,7 +88,7 @@ class LevySde(Sde):
         return torch.tensor(self.levy.icdf.lda)
 
     def jump_mean(self):
-        return 0
+        return self.levy.jump_mean()
 
 
 class TestLevy(Levy):
