@@ -151,7 +151,10 @@ class JumpDiffusionSolver(SdeSolver):
             dt = torch.minimum(h, next_jump_time - t)
             assert (next_jump_time >= t).all()
             # step diffusion until the next time step
-            corr_normals = self.sample_corr_normals(x.shape + torch.Size([1]), h.unsqueeze(-1))
+            if self.sde.diffusion_struct == 'diag':
+                corr_normals = self.sample_corr_normals(x.shape + torch.Size([1]), h.unsqueeze(-1))
+            else:
+                corr_normals = self.sample_corr_normals(x.shape + torch.Size([int(self.sde.brown_dim / self.sde.dim)]), h.unsqueeze(-1))
             x = self.step(t, x, dt, corr_normals)
             normals[:, total_steps - 1] = corr_normals
             left_paths[:, total_steps] = x
