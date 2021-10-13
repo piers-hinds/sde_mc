@@ -3,6 +3,9 @@ import numpy as np
 from abc import abstractmethod
 from .sde import Sde
 
+UNIFORM_TOL = 5.960464477539063e-08
+
+
 class InverseCdf:
     def __init__(self, c_minus, c_plus, mu, alpha, epsilon):
         self.cm = c_minus
@@ -74,7 +77,7 @@ class LevySde(Sde):
         return self.levy.jumps(t, x, jumps)
 
     def sample_jumps(self, size, device):
-        unifs = torch.rand(size, device=device)
+        unifs = torch.rand(size, device=device) + UNIFORM_TOL / 3
         return self.levy.icdf(unifs)
 
     def jump_rate(self):
