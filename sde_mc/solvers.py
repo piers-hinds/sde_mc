@@ -118,7 +118,10 @@ class JumpDiffusionSolver(SdeSolver):
         left_paths = torch.zeros_like(paths)
         jump_paths = torch.zeros_like(paths)
         time_paths = torch.zeros(size=(bs, steps + 1, 1), device=self.device) + self.time_interval
-        normals = torch.zeros(size=(bs, steps, self.sde.dim), device=self.device)
+        if self.sde.diffusion_struct == 'diag':
+            normals = torch.zeros(size=(bs, steps, self.sde.dim), device=self.device)
+        else:
+            normals = torch.zeros(size=(bs, steps, self.sde.dim, int(self.sde.brown_dim / self.sde.dim)), device=self.device)
         return paths, left_paths, time_paths, jump_paths, normals
 
     def solve(self, bs=1, return_normals=False):
