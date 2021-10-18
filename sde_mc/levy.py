@@ -143,3 +143,35 @@ class ExpTestLevy(Levy):
 
     def beta(self):
         return np.sqrt((self.cp + self.cm) * (self.epsilon ** (2 - self.alpha)) / (2 - self.alpha))
+
+
+class Levy2d(Levy):
+    def __init__(self, c_plus, c_minus, alpha, mu, f, epsilon):
+        super(Levy2d, self).__init__(2, InverseCdf(c_minus, c_plus, mu, alpha, epsilon))
+        self.cp = c_plus
+        self.cm = c_minus
+        self.alpha = alpha
+        self.mu = mu
+        self.f = f
+        self.epsilon = epsilon
+
+    def drift(self, t, x):
+        return torch.ones_like(x) * (- self.f * (self.cp - self.cm) * (1 / self.mu + 1 / (self.mu**2)))
+
+    def diffusion(self, t, x):
+        return torch.ones_like(x)
+
+    def jumps(self, t, x, jumps):
+        return self.f * jumps * torch.ones_like(x)
+
+    def gamma(self):
+        return (self.cp - self.cm) * (1 - self.epsilon**(1 - self.alpha)) / (1- self.alpha)
+
+    def beta(self):
+        return np.sqrt((self.cp + self.cm) * (self.epsilon**(2 - self.alpha)) / (2 - self.alpha))
+
+    def jump_mean(self):
+        if self.cp == self.cm:
+            return 0
+        measure = (self.cp + self.cm) * (1 / self.mu + (self.epsilon**(-self.alpha) - 1) / (self.alpha))
+        return (self.cp - self.cm) * ( (1 / self.mu + 1 / (self.mu**2)) +  ((1 - self.epsilon**(1-self.alpha)) / (1 - self.alpha)) ) / measure
