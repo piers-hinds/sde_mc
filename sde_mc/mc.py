@@ -231,7 +231,7 @@ def mc_apply_cvs(models, solver, trials, payoff, discounter, sim_bs=1e5, bs=1000
 
 
 def mc_adaptive_cv(models, opt, solver, trials, steps, payoff, discounter, sim_bs=(1e4, 1e4), bs=(1000, 1000),
-                   epochs=10, print_losses=True):
+                   epochs=10, print_losses=True, pre_trained=False):
     """Monte Carlo simulation of a functional of an SDE's terminal value with neural control variates
 
         Generates initial trajectories and payoffs on which regression is performed to find optimal control variates (a
@@ -285,8 +285,9 @@ def mc_adaptive_cv(models, opt, solver, trials, steps, payoff, discounter, sim_b
 
     # Training
     train_start = time.time()
-    train_dataloader = simulate_adapted_data(train_trials, solver, payoff, discounter, bs=train_bs)
-    _ = train_adapted_control_variates(models, opt, train_dataloader, solver, discounter, epochs, print_losses)
+    if not pre_trained:
+        train_dataloader = simulate_adapted_data(train_trials, solver, payoff, discounter, bs=train_bs)
+        _ = train_adapted_control_variates(models, opt, train_dataloader, solver, discounter, epochs, print_losses)
     train_end = time.time()
     train_time = train_end - train_start
 
