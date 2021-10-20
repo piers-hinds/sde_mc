@@ -143,6 +143,9 @@ class ExpTestLevy(Levy):
 
     def beta(self):
         return np.sqrt((self.cp + self.cm) * (self.epsilon ** (2 - self.alpha)) / (2 - self.alpha))
+    
+    def jump_mean(self):
+        return 0
 
 
 class Levy2d(Levy):
