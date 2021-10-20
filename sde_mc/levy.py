@@ -130,7 +130,7 @@ class ExpTestLevy(Levy):
         self.epsilon = epsilon
 
     def drift(self, t, x):
-        return torch.zeros_like(x)
+        return self.r * x
 
     def diffusion(self, t, x):
         return x * self.sigma
