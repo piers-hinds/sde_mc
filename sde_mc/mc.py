@@ -218,8 +218,12 @@ def mc_apply_cvs(models, solver, trials, payoff, discounter, sim_bs=1e5, bs=1000
     while trials_remaining > 0:
         batch_size = min(sim_bs, trials_remaining)
         trials_remaining -= batch_size
-        test_dl = simulate_data(batch_size, solver, payoff, discounter, bs=bs, inference=True)
-        x, y = apply_diffusion_control_variate(models, test_dl, solver, discounter)
+        if solver.has_jumps:
+            test_dl = simulate_adapted_data(batch_size, solver, payoff, discounter, bs=bs, inference=True)
+            x, y = apply_adapted_control_variates(models, test_dl, solver, discounter)
+        else:
+            test_dl = simulate_data(batch_size, solver, payoff, discounter, bs=bs, inference=True)
+            x, y = apply_diffusion_control_variate(models, test_dl, solver, discounter)
         run_sum += x
         run_sum_sq += y
 
