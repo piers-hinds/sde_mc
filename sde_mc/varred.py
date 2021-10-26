@@ -4,7 +4,7 @@ import time
 from .helpers import partition, remove_steps
 
 
-def train_diffusion_control_variate(model, opt, dl, solver, discounter, epochs, print_losses):
+def train_diffusion_control_variate(model, opt, dl, solver, discounter, epochs, print_losses=True, tol=0):
     trials, steps, dim = dl.dataset.paths.shape
     time_points = partition(solver.time_interval, solver.num_steps, ends='left', device=solver.device)
     discounts = discounter(time_points).view(1, len(time_points), 1)
@@ -25,7 +25,8 @@ def train_diffusion_control_variate(model, opt, dl, solver, discounter, epochs, 
                 f_in = torch.cat([rep_time_points, paths.reshape(dl.batch_size * steps, dim)], dim=-1)
 
             f_out = model(f_in).view(dl.batch_size, steps, dim)
-            brownians_cv = integrate_cv(normals, f_out, discounts, solver.sde.diffusion_struct, tol=0)
+            brownians_cv = integrate_cv(normals, f_out, discounts, solver.sde.diffusion_struct, tol=tol,
+                                        time_interval=solver.time_interval)
             var_loss = (payoffs + brownians_cv).var()
             run_loss += var_loss.item()
             var_loss.backward()
@@ -39,7 +40,7 @@ def train_diffusion_control_variate(model, opt, dl, solver, discounter, epochs, 
     return end_train - start_train, loss_arr
 
 
-def apply_diffusion_control_variate(model, dl, solver, discounter):
+def apply_diffusion_control_variate(model, dl, solver, discounter, tol=0):
     trials, steps, dim = dl.dataset.paths.shape
     time_points = partition(solver.time_interval, solver.num_steps, ends='left', device=solver.device)
     discounts = discounter(time_points).view(1, len(time_points), 1)
@@ -54,14 +55,15 @@ def apply_diffusion_control_variate(model, dl, solver, discounter):
                 rep_time_points = time_points.repeat(dl.batch_size).unsqueeze(-1)
                 f_in = torch.cat([rep_time_points, paths.reshape(dl.batch_size * steps, dim)], dim=-1)
             f_out = model(f_in).view(dl.batch_size, steps, dim)
-            brownians_cv = integrate_cv(normals, f_out, discounts, solver.sde.diffusion_struct, tol=0)
+            brownians_cv = integrate_cv(normals, f_out, discounts, solver.sde.diffusion_struct, tol=tol,
+                                        time_interval=solver.time_interval)
             gammas = payoffs + brownians_cv
             run_sum += gammas.sum()
             run_sum_sq += (gammas * gammas).sum()
     return run_sum, run_sum_sq
 
 
-def apply_adapted_control_variates(models, dl, solver, discounter):
+def apply_adapted_control_variates(models, dl, solver, discounter, tol=0):
     n, steps, dim = dl.dataset.paths.shape
     f, g = models
     run_sum, run_sum_sq = 0, 0
@@ -78,7 +80,8 @@ def apply_adapted_control_variates(models, dl, solver, discounter):
 
             f_outputs = f(f_inputs).view(normals.shape)
 
-            brownian_cv = integrate_cv(normals, f_outputs, discounts, solver.sde.diffusion_struct, tol=0)  # CHANGE TOL
+            brownian_cv = integrate_cv(normals, f_outputs, discounts, solver.sde.diffusion_struct, tol=tol,
+                                       time_interval=solver.time_interval)
 
             if g.sequential:
                 g_inputs = torch.cat([time_paths, left_paths], dim=-1)
@@ -96,7 +99,7 @@ def apply_adapted_control_variates(models, dl, solver, discounter):
     return run_sum, run_sum_sq
 
 
-def train_adapted_control_variates(models, opt, dl, solver, discounter, epochs=10, print_losses=True):
+def train_adapted_control_variates(models, opt, dl, solver, discounter, epochs=10, print_losses=True, tol=0):
     trials, steps, dim = dl.dataset.paths.shape
     loss_arr = []
     f, g = models
@@ -118,7 +121,8 @@ def train_adapted_control_variates(models, opt, dl, solver, discounter, epochs=1
 
             f_outputs = f(f_inputs).view(normals.shape)
 
-            brownian_cv = integrate_cv(normals, f_outputs, discounts, solver.sde.diffusion_struct, tol=0)  # CHANGE TOL
+            brownian_cv = integrate_cv(normals, f_outputs, discounts, solver.sde.diffusion_struct, tol=tol,
+                                       time_interval=solver.time_interval)
 
             if g.sequential:
                 g_inputs = torch.cat([time_paths, left_paths], dim=-1)
@@ -148,7 +152,7 @@ def train_adapted_control_variates(models, opt, dl, solver, discounter, epochs=1
 
 
 def integrate_cv(normals, f_out, discounts, diffusion_struct, tol=0, time_interval=None):
-    if tol:
+    if tol != 0:
         assert time_interval is not None
         steps = normals.shape[1]
         new_steps = remove_steps(tol, steps, time_interval)

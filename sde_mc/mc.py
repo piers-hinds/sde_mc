@@ -117,7 +117,7 @@ def mc_simple(num_trials, sde_solver, payoff, discounter=None, bs=None, return_n
 
 
 def mc_control_variates(models, opt, solver, trials, steps, payoff, discounter, sim_bs=(1e5, 1e5),
-                        bs=(1000, 1000), epochs=10, print_losses=True):
+                        bs=(1000, 1000), epochs=10, print_losses=True, tol=0):
     """Monte Carlo simulation of a functional of an SDE's terminal value with neural control variates
 
     Generates initial trajectories and payoffs on which regression is performed to find optimal control variates (a
@@ -170,18 +170,19 @@ def mc_control_variates(models, opt, solver, trials, steps, payoff, discounter, 
 
     # Training
     train_start = time.time()
-    sim_train_control_variates(models, opt, solver, train_trials, payoff, discounter, train_sim_bs, train_bs, epochs)
+    sim_train_control_variates(models, opt, solver, train_trials, payoff, discounter, train_sim_bs, train_bs, epochs,
+                               print_losses, tol)
     train_end = time.time()
 
     # Inference
     solver.num_steps = test_steps
-    mc_stats = mc_apply_cvs(models, solver, test_trials, payoff, discounter, test_sim_bs, test_bs)
+    mc_stats = mc_apply_cvs(models, solver, test_trials, payoff, discounter, test_sim_bs, test_bs, tol)
     mc_stats.time_elapsed += train_end - train_start
 
     return mc_stats
 
 
-def mc_apply_cvs(models, solver, trials, payoff, discounter, sim_bs=1e5, bs=1000):
+def mc_apply_cvs(models, solver, trials, payoff, discounter, sim_bs=1e5, bs=1000, tol=0):
     """Monte Carlo simulation of a function of SDE's terminal value with applied control variates
 
     :param models: callable(s)
@@ -217,10 +218,10 @@ def mc_apply_cvs(models, solver, trials, payoff, discounter, sim_bs=1e5, bs=1000
         trials_remaining -= batch_size
         if solver.has_jumps:
             test_dl = simulate_adapted_data(batch_size, solver, payoff, discounter, bs=bs, inference=True)
-            x, y = apply_adapted_control_variates(models, test_dl, solver, discounter)
+            x, y = apply_adapted_control_variates(models, test_dl, solver, discounter, tol)
         else:
             test_dl = simulate_data(batch_size, solver, payoff, discounter, bs=bs, inference=True)
-            x, y = apply_diffusion_control_variate(models, test_dl, solver, discounter)
+            x, y = apply_diffusion_control_variate(models, test_dl, solver, discounter, tol)
         run_sum += x
         run_sum_sq += y
 
@@ -232,7 +233,7 @@ def mc_apply_cvs(models, solver, trials, payoff, discounter, sim_bs=1e5, bs=1000
 
 
 def mc_adaptive_cv(models, opt, solver, trials, steps, payoff, discounter, sim_bs=(1e4, 1e4), bs=(1000, 1000),
-                   epochs=10, print_losses=True, pre_trained=False):
+                   epochs=10, print_losses=True, pre_trained=False, tol=0):
     """Monte Carlo simulation of a functional of an SDE's terminal value with neural control variates
 
         Generates initial trajectories and payoffs on which regression is performed to find optimal control variates (a
@@ -288,7 +289,7 @@ def mc_adaptive_cv(models, opt, solver, trials, steps, payoff, discounter, sim_b
     train_start = time.time()
     if not pre_trained:
         train_dataloader = simulate_adapted_data(train_trials, solver, payoff, discounter, bs=train_bs)
-        _ = train_adapted_control_variates(models, opt, train_dataloader, solver, discounter, epochs, print_losses)
+        _ = train_adapted_control_variates(models, opt, train_dataloader, solver, discounter, epochs, print_losses, tol)
     train_end = time.time()
     train_time = train_end - train_start
 
@@ -301,7 +302,7 @@ def mc_adaptive_cv(models, opt, solver, trials, steps, payoff, discounter, sim_b
         batch_size = min(test_sim_bs, trials_remaining)
         trials_remaining -= batch_size
         test_dataloader = simulate_adapted_data(batch_size, solver, payoff, discounter, bs=test_bs, inference=True)
-        x, y = apply_adapted_control_variates(models, test_dataloader, solver, discounter)
+        x, y = apply_adapted_control_variates(models, test_dataloader, solver, discounter, tol)
         run_sum += x
         run_sum_sq += y
 
@@ -336,6 +337,6 @@ def simulate_adapted_data(trials, solver, payoff, discounter, bs=1000, inference
 
 
 def sim_train_control_variates(models, opt, solver, trials, payoff, discounter, sim_bs, bs, epochs=10,
-                               print_losses=True):
+                               print_losses=True, tol=0):
     train_dl = simulate_data(trials, solver, payoff, discounter, bs=bs)
-    _, losses = train_diffusion_control_variate(models, opt, train_dl, solver, discounter, epochs, print_losses)
+    _, losses = train_diffusion_control_variate(models, opt, train_dl, solver, discounter, epochs, print_losses, tol)
