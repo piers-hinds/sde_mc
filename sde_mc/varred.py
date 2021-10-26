@@ -7,7 +7,6 @@ from .helpers import partition, remove_steps
 def train_diffusion_control_variate(model, opt, dl, solver, discounter, epochs, print_losses):
     trials, steps, dim = dl.dataset.paths.shape
     time_points = partition(solver.time_interval, solver.num_steps, ends='left', device=solver.device)
-
     discounts = discounter(time_points).view(1, len(time_points), 1)
     loss_arr = []
 
@@ -43,7 +42,6 @@ def train_diffusion_control_variate(model, opt, dl, solver, discounter, epochs, 
 def apply_diffusion_control_variate(model, dl, solver, discounter):
     trials, steps, dim = dl.dataset.paths.shape
     time_points = partition(solver.time_interval, solver.num_steps, ends='left', device=solver.device)
-    rep_time_points = time_points.unsqueeze(-1).repeat(dl.batch_size, 1, 1)
     discounts = discounter(time_points).view(1, len(time_points), 1)
 
     run_sum, run_sum_sq = 0, 0
@@ -67,7 +65,7 @@ def apply_adapted_control_variates(models, dl, solver, discounter):
     n, steps, dim = dl.dataset.paths.shape
     f, g = models
     run_sum, run_sum_sq = 0, 0
-    with torch.no_grad():
+    with torch.inference_mode():
         for (paths, normals, left_paths, time_paths, jump_paths), payoffs in dl:
             h = torch.diff(time_paths, dim=1)
             discounts = discounter(time_paths)
