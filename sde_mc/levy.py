@@ -91,9 +91,9 @@ class LevySde(Sde):
         return self.levy.jump_mean()
 
 
-class TestLevy(Levy):
+class ExampleLevy(Levy):
     def __init__(self, c_plus, c_minus, alpha, mu, f, epsilon):
-        super(TestLevy, self).__init__(1, InverseCdf(c_minus, c_plus, mu, alpha, epsilon))
+        super(ExampleLevy, self).__init__(1, InverseCdf(c_minus, c_plus, mu, alpha, epsilon))
         self.cm = c_minus
         self.cp = c_plus
         self.alpha = alpha
@@ -117,9 +117,9 @@ class TestLevy(Levy):
         return np.sqrt((self.cp + self.cm) * (self.epsilon ** (2 - self.alpha)) / (2 - self.alpha))
 
 
-class ExpTestLevy(Levy):
+class ExpExampleLevy(Levy):
     def __init__(self, c_minus, c_plus, alpha, mu, r, sigma, f, epsilon):
-        super(ExpTestLevy, self).__init__(1, InverseCdf(c_minus, c_plus, mu, alpha, epsilon))
+        super(ExpExampleLevy, self).__init__(1, InverseCdf(c_minus, c_plus, mu, alpha, epsilon))
         self.cm = c_minus
         self.cp = c_plus
         self.alpha = alpha
