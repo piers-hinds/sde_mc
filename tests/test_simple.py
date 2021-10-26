@@ -99,3 +99,13 @@ def mlps_1d():
 @pytest.fixture
 def uniform_grid():
     return UniformGrid(0., 3., 10)
+
+
+@pytest.fixture
+def icdf():
+    return InverseCdf(1, 1, 2, 0.5, 0.01)
+
+
+@pytest.fixture
+def exp_example_levy():
+    return ExpExampleLevy(1, 1, 0.5, 2, 0.02, 0.2, 0.1, 0.01)
