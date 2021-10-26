@@ -1,4 +1,5 @@
 import torch
+import numpy as np
 
 
 def partition(interval, steps, ends='right', device='cpu'):
@@ -64,3 +65,9 @@ def mc_estimates(run_sum, run_sum_squares, n):
     sample_mean = run_sum / n
     sample_var = ((run_sum_squares - (run_sum * run_sum) / n) / (n - 1))
     return sample_mean, sample_var
+
+
+def remove_steps(time_tol, steps, time_interval):
+    """Returns index of last step when a tolerance is removed from the interval"""
+    steps_to_remove = time_tol / (time_interval / steps)
+    return int(np.floor(steps - steps_to_remove))

@@ -1,5 +1,6 @@
 from .test_simple import *
 
+
 # helpers.py
 def test_partition():
     expected = torch.tensor([0., 1., 2., 3.])
@@ -24,3 +25,8 @@ def test_mc_estimates():
     result = mc_estimates(run_sum, run_sum_sq, n)
     assert torch.isclose(result[0], expected[0])
     assert torch.isclose(result[1], expected[1])
+
+
+def test_remove_steps():
+    result = remove_steps(0.1, 1000, 3)
+    assert result == 966
