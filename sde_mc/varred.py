@@ -1,7 +1,7 @@
 import torch
 import numpy as np
 import time
-from .helpers import partition
+from .helpers import partition, remove_steps
 
 
 def train_diffusion_control_variate(model, opt, dl, solver, discounter, epochs, print_losses):
@@ -26,7 +26,7 @@ def train_diffusion_control_variate(model, opt, dl, solver, discounter, epochs, 
                 f_in = torch.cat([rep_time_points, paths.reshape(dl.batch_size * steps, dim)], dim=-1)
 
             f_out = model(f_in).view(dl.batch_size, steps, dim)
-            brownians_cv = (normals * f_out * discounts).sum(-1).sum(-1)
+            brownians_cv = integrate_cv(normals, f_out, discounts, solver.sde.diffusion_struct, tol=0)
             var_loss = (payoffs + brownians_cv).var()
             run_loss += var_loss.item()
             var_loss.backward()
@@ -56,7 +56,7 @@ def apply_diffusion_control_variate(model, dl, solver, discounter):
                 rep_time_points = time_points.repeat(dl.batch_size).unsqueeze(-1)
                 f_in = torch.cat([rep_time_points, paths.reshape(dl.batch_size * steps, dim)], dim=-1)
             f_out = model(f_in).view(dl.batch_size, steps, dim)
-            brownians_cv = (normals * f_out * discounts).sum(-1).sum(-1)
+            brownians_cv = integrate_cv(normals, f_out, discounts, solver.sde.diffusion_struct, tol=0)
             gammas = payoffs + brownians_cv
             run_sum += gammas.sum()
             run_sum_sq += (gammas * gammas).sum()
@@ -79,10 +79,8 @@ def apply_adapted_control_variates(models, dl, solver, discounter):
                 f_inputs = torch.cat([time_inputs, paths_inputs], dim=-1)
 
             f_outputs = f(f_inputs).view(normals.shape)
-            if solver.sde.diffusion_struct == 'diag':
-                brownian_cv = (normals * f_outputs).sum(-1).sum(-1)
-            else:
-                brownian_cv = (normals * f_outputs).sum(-1).sum(-1).sum(-1)
+
+            brownian_cv = integrate_cv(normals, f_outputs, discounts, solver.sde.diffusion_struct, tol=0)  # CHANGE TOL
 
             if g.sequential:
                 g_inputs = torch.cat([time_paths, left_paths], dim=-1)
@@ -105,7 +103,8 @@ def train_adapted_control_variates(models, opt, dl, solver, discounter, epochs=1
     loss_arr = []
     f, g = models
     for epoch in range(epochs):
-        f.train(); g.train()
+        f.train();
+        g.train()
         run_loss = 0
         for (paths, normals, left_paths, time_paths, jump_paths), payoffs in dl:
             opt.zero_grad()
@@ -120,10 +119,8 @@ def train_adapted_control_variates(models, opt, dl, solver, discounter, epochs=1
                 f_inputs = torch.cat([time_inputs, paths_inputs], dim=-1)
 
             f_outputs = f(f_inputs).view(normals.shape)
-            if solver.sde.diffusion_struct == 'diag':
-                brownian_cv = (normals * f_outputs).sum(-1).sum(-1)
-            else:
-                brownian_cv = (normals * f_outputs).sum(-1).sum(-1).sum(-1)
+
+            brownian_cv = integrate_cv(normals, f_outputs, discounts, solver.sde.diffusion_struct, tol=0)  # CHANGE TOL
 
             if g.sequential:
                 g_inputs = torch.cat([time_paths, left_paths], dim=-1)
@@ -147,13 +144,23 @@ def train_adapted_control_variates(models, opt, dl, solver, discounter, epochs=1
         if print_losses:
             print('{}: Train loss: {:.5f}     95% confidence interval: {:.5f}'.format(epoch, loss_arr[epoch], np.sqrt(
                 loss_arr[epoch]) * 2 / np.sqrt(trials)))
-        f.eval(); g.eval()
+        f.eval();
+        g.eval()
     return None
 
 
-def integrate_cv(normals, f_out, discounts, diffusion_struct, tol=0):
+def integrate_cv(normals, f_out, discounts, diffusion_struct, tol=0, time_interval=None):
+    if tol:
+        assert time_interval is not None
+        steps = normals.shape[1]
+        new_steps = remove_steps(tol, steps, time_interval)
+        normals = normals[:, :new_steps]
+        f_out = f_out[:, :new_steps]
+        discounts = discounts[:, :new_steps]
+
     if diffusion_struct == 'diag':
         return (normals * f_out * discounts).sum(-1).sum(-1)
     else:
-        return (normals * f_out * discounts).sum(-1).sum(-1).sum(-1)
+        return ((normals * f_out).sum(-1) * discounts).sum(-1).sum(-1)
+
 
