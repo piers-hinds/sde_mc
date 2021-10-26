@@ -117,7 +117,7 @@ def mc_simple(num_trials, sde_solver, payoff, discounter=None, bs=None, return_n
 
 
 def mc_control_variates(models, opt, solver, trials, steps, payoff, discounter, sim_bs=(1e5, 1e5),
-                        bs=(1000, 1000), epochs=10, print_losses=True, no_train=False):
+                        bs=(1000, 1000), epochs=10, print_losses=True):
     """Monte Carlo simulation of a functional of an SDE's terminal value with neural control variates
 
     Generates initial trajectories and payoffs on which regression is performed to find optimal control variates (a
@@ -156,9 +156,6 @@ def mc_control_variates(models, opt, solver, trials, steps, payoff, discounter, 
 
     :param print_losses: bool (default = True)
         If True, prints the loss function values during training
-        
-    :param no_train: bool (default = False)
-        If False, doesn't train the network first.
 
     :return: MCStatistics
         The relevant MC statistics

@@ -149,3 +149,11 @@ def train_adapted_control_variates(models, opt, dl, solver, discounter, epochs=1
                 loss_arr[epoch]) * 2 / np.sqrt(trials)))
         f.eval(); g.eval()
     return None
+
+
+def integrate_cv(normals, f_out, discounts, diffusion_struct, tol=0):
+    if diffusion_struct == 'diag':
+        return (normals * f_out * discounts).sum(-1).sum(-1)
+    else:
+        return (normals * f_out * discounts).sum(-1).sum(-1).sum(-1)
+
