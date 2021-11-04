@@ -71,3 +71,29 @@ def remove_steps(time_tol, steps, time_interval):
     """Returns index of last step when a tolerance is removed from the interval"""
     steps_to_remove = time_tol / (time_interval / steps)
     return int(np.floor(steps - steps_to_remove))
+
+
+def get_corr_matrix(rhos):
+    """Returns correlation matrix when given a vector of correlations
+
+    :param rhos: torch.tensor
+        The correlations
+
+    :return: torch.tensor
+        The correlation matrix
+    """
+    rhos_tensor = torch.tensor(rhos)
+    t_n = len(rhos)
+    sol = solve_quadratic((torch.tensor(1), torch.tensor(1), torch.tensor(-2 * t_n)))
+    assert torch.isclose(sol, sol.floor()), "Length of correlation vector is not triangular"
+    n = int(sol + 1)
+
+    corr_matrix = torch.eye(n)
+    triu_indices = torch.triu_indices(row=n, col=n, offset=1)
+    corr_matrix[triu_indices[0], triu_indices[1]] = rhos_tensor
+    corr_matrix += torch.triu(corr_matrix, 1).t()
+    try:
+        torch.linalg.cholesky(corr_matrix)
+    except:
+        raise RuntimeError('Matrix is not positive semidefinite')
+    return corr_matrix

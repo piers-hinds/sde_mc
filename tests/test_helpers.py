@@ -1,3 +1,5 @@
+import torch
+
 from .test_simple import *
 
 
@@ -30,3 +32,10 @@ def test_mc_estimates():
 def test_remove_steps():
     result = remove_steps(0.1, 1000, 3)
     assert result == 966
+
+
+def test_get_corr_matrix():
+    rhos_test = [0.7, 0.2, -0.3]
+    expected = torch.tensor([[ 1.0000,  0.7000,  0.2000], [0.7000,  1.0000, -0.3000], [0.2000, -0.3000,  1.0000]])
+    mat = get_corr_matrix(rhos_test)
+    assert torch.allclose(mat, expected)
