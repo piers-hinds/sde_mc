@@ -85,7 +85,7 @@ class LevySde(Sde):
         return self.levy.icdf(unifs)
 
     def jump_rate(self):
-        return torch.tensor(self.levy.icdf.lda)
+        return torch.tensor(self.levy.icdf.lda * self.levy.dim)
 
     def jump_mean(self):
         return self.levy.jump_mean()
