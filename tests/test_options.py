@@ -45,6 +45,11 @@ def test_rainbow(terminals_2d):
     assert torch.allclose(rainbow(terminals_2d), torch.tensor([1., 0., 0.2]))
 
 
+def test_best_of(terminals_2d):
+    best_of = BestOf(strike=1)
+    assert torch.allclose(best_of(terminals_2d), torch.tensor([2., 1., 1.2]))
+
+
 def test_constant_short_rate():
     time_points = torch.tensor([0., 1., 2.])
     constant_short_rate = ConstantShortRate(r=0.02)

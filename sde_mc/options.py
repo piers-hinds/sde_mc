@@ -228,6 +228,17 @@ class HestonRainbow(Option):
                                                                                 device=spot.device))
 
 
+class BestOf(Option):
+    def __init__(self, strike, log=False):
+        super(BestOf, self).__init__(log)
+        self.strike = strike
+
+    def __call__(self, x):
+        x = torch.exp(x) if self.log else x
+        max_assets = torch.max(x, dim=1).values
+        return torch.maximum(max_assets, self.strike * torch.ones_like(max_assets))
+
+
 class ConstantShortRate:
     """Constant short rate discounter"""
 
@@ -242,4 +253,3 @@ class ConstantShortRate:
         if not torch.is_tensor(t):
             t = torch.tensor(t)
         return torch.exp(-t * self.r)
-
