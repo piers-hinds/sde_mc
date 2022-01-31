@@ -118,8 +118,8 @@ class ExampleLevy(Levy):
 
 
 class ExpExampleLevy(Levy):
-    def __init__(self, c_minus, c_plus, alpha, mu, r, sigma, f, epsilon):
-        super(ExpExampleLevy, self).__init__(1, InverseCdf(c_minus, c_plus, mu, alpha, epsilon))
+    def __init__(self, c_minus, c_plus, alpha, mu, r, sigma, f, epsilon, dim=1):
+        super(ExpExampleLevy, self).__init__(dim, InverseCdf(c_minus, c_plus, mu, alpha, epsilon))
         self.cm = c_minus
         self.cp = c_plus
         self.alpha = alpha
