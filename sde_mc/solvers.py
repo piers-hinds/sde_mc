@@ -1,5 +1,6 @@
 import torch
 import torch.nn.functional as F
+from scipy.stats import poisson
 from abc import ABC, abstractmethod
 from .schemes import EulerScheme, HestonScheme
 from .helpers import solve_quadratic
@@ -95,7 +96,7 @@ class HestonSolver(HestonScheme, DiffusionSolver):
 class JumpDiffusionSolver(SdeSolver):
     def __init__(self, sde, time_interval, num_steps, device='cpu', seed=1):
         super(JumpDiffusionSolver, self).__init__(sde, time_interval, num_steps, device, seed)
-        self.max_jumps = max(int(self.time_interval * self.sde.jump_rate().sum() * 10), 5)
+        self.max_jumps = max(int(self.time_interval * poisson.ppf(1 - 1/1e9, self.sde.jump_rate().sum())), 5)
 
     @abstractmethod
     def step(self, t, x, h, corr_normals):
