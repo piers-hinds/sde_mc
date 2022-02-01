@@ -65,9 +65,10 @@ class LevySde(Sde):
     """An Sde interface for a Levy-driven SDE which approximates small jumps with an additional diffusion
     component"""
 
-    def __init__(self, levy, init_value, device='cpu', seed=1):
+    def __init__(self, levy, init_value, scale_jump_rate=True, device='cpu', seed=1):
         super(LevySde, self).__init__(init_value, levy.dim, levy.dim * 2, 'indep')
         self.levy = levy
+        self.scale_rate = scale_jump_rate
 
     def drift(self, t, x):
         return self.levy.drift(t, x) - self.levy.jumps(t, x, 1) * self.levy.gamma()
@@ -85,7 +86,10 @@ class LevySde(Sde):
         return self.levy.icdf(unifs)
 
     def jump_rate(self):
-        return torch.tensor(self.levy.icdf.lda * self.levy.dim)
+        if self.scale_rate:
+            return torch.tensor(self.levy.icdf.lda * self.levy.dim)
+        else:
+            return torch.tensor(self.levy.icdf.lda)
 
     def jump_mean(self):
         return self.levy.jump_mean()
