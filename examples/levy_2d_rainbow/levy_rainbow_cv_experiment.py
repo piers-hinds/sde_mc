@@ -65,5 +65,5 @@ if __name__ == '__main__':
 
     data = pd.DataFrame(
         {'strike': strikes, 'mean': solutions, 'conf_interval': errors, 'time': times, 'trials': num_trials})
-    data.to_csv(args.dir + '/' + args.fname)
+    data.to_csv(os.path.join(args.dir, args.fname))
     print('save successful')
