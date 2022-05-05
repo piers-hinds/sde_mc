@@ -15,6 +15,11 @@ def gbm_2d():
 
 
 @pytest.fixture
+def log_gbm():
+    return LogGbm(0.02, 0.2, torch.tensor([1.]))
+
+
+@pytest.fixture
 def heston_1d():
     return Heston(0.02, 0.5, 0.1, 0.15, -0.5, torch.tensor([1., 2.]))
 

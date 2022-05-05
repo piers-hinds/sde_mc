@@ -12,6 +12,12 @@ def test_gbm(gbm_2d):
     assert torch.allclose(gbm_2d.corr_matrix, torch.eye(2))
 
 
+def test_log_gbm(log_gbm):
+    x0 = log_gbm.init_value
+    assert torch.allclose(log_gbm.drift(0, x0), torch.tensor(0.02 - 0.5 * 0.2 * 0.2))
+    assert torch.allclose(log_gbm.diffusion(0, x0), torch.tensor(0.2))
+
+
 def test_merton(merton_2d):
     x0 = merton_2d.init_value
     jumps = torch.tensor([2., 1.])

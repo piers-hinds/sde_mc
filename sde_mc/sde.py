@@ -207,6 +207,18 @@ class Gbm(DiffusionSde):
         return self.sigma * x
 
 
+class LogGbm(Gbm):
+    """One-dimensional log GBM - see docs for Gbm class"""
+    def __init__(self, mu, sigma, init_value):
+        super(LogGbm, self).__init__(mu, sigma, init_value, 1)
+
+    def drift(self, t, x):
+        return (self.mu - 0.5 * self.sigma * self.sigma) * torch.ones_like(x)
+
+    def diffusion(self, t, x):
+        return self.sigma * torch.ones_like(x)
+
+
 class DoubleGbm(DiffusionSde):
     """Geometric Brownian motion driven by two independent d-dimensional Brownian motions, used for testing the
     'indep' method for solving"""
