@@ -146,9 +146,9 @@ def train_adapted_control_variates(models, opt, dl, solver, discounter, epochs=1
         if print_losses:
             print('{}: Train loss: {:.5f}     95% confidence interval: {:.5f}'.format(epoch, loss_arr[epoch], np.sqrt(
                 loss_arr[epoch]) * 2 / np.sqrt(trials)))
-        f.eval();
+        f.eval()
         g.eval()
-    return None
+    return loss_arr
 
 
 def integrate_cv(normals, f_out, discounts, diffusion_struct, tol=0, time_interval=None):
