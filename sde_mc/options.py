@@ -125,6 +125,32 @@ def bs_digital_call(spot, strike, expiry, r, sigma):
     return (1 - lognorm.cdf(strike, s=sd, scale=np.exp(mn))) * np.exp(-r * expiry)
 
 
+def bs_asian_call(spot, strike, expiry, r, sigma):
+    """Computes the true value of a geometric Asian call under Black-Scholes assumptions
+
+    :param spot: float
+        The spot price of the asset
+
+    :param strike: float
+        The strike price of the option
+
+    :param expiry: float
+        The time to maturity of the option
+
+    :param r: float
+        The risk-free rate
+
+    :param sigma: float
+        The volatility of the asset
+
+    :return: float
+        The value of the option
+    """
+    sig_g = sigma / np.sqrt(3)
+    b = 0.5 * (r - 0.5 * sig_g ** 2)
+    return bs_call(spot, strike, expiry, b, sig_g)
+
+
 class Option(ABC):
     """Abstract base class for options"""
 
@@ -216,7 +242,7 @@ class Digital(Option):
 
 class AsianCall(Option):
     """Asian call option"""
-    
+
     def __init__(self, time_interval, strike, log=False):
         super().__init__(log=log)
         self.time_interval = time_interval
