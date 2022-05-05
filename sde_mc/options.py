@@ -214,6 +214,20 @@ class Digital(Option):
         return torch.where(spot > self.strike, torch.ones_like(spot), torch.zeros_like(spot))
 
 
+class AsianCall(Option):
+    """Asian call option"""
+    
+    def __init__(self, time_interval, strike, log=False):
+        super().__init__(log=log)
+        self.time_interval = time_interval
+        self.strike = strike
+
+    def __call__(self, x):
+        spot = torch.exp(x[:, 1] / self.time_interval) if self.log else x[:, 1] / self.time_interval
+        return torch.where(spot > self.strike, spot - self.strike,
+                           torch.tensor(0., dtype=spot.dtype, device=spot.device))
+
+
 class HestonRainbow(Option):
     def __init__(self, strike, log=False):
         super(HestonRainbow, self).__init__(log)
