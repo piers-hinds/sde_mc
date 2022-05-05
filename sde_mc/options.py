@@ -148,7 +148,9 @@ def bs_asian_call(spot, strike, expiry, r, sigma):
     """
     sig_g = sigma / np.sqrt(3)
     b = 0.5 * (r - 0.5 * sig_g ** 2)
-    return bs_call(spot, strike, expiry, b, sig_g)
+    d1 = (np.log(spot / strike) + (b + sig_g ** 2 / 2) * expiry) / (sig_g * np.sqrt(expiry))
+    d2 = d1 - sig_g * np.sqrt(expiry)
+    return spot * np.exp((b - r) * expiry) * norm.cdf(d1) - strike * np.exp(-r * expiry) * norm.cdf(d2)
 
 
 class Option(ABC):
