@@ -374,3 +374,33 @@ class Merton(LogNormalJumpsSde):
     def jumps(self, t, x, jumps):
         return x * jumps
 
+
+class AsianWrapper(Sde):
+    """Wraps an existing 1-D SDE object and computes the integral of the process over time - for Asian options"""
+    
+    def __init__(self, base_sde):
+        super().__init__(torch.cat([base_sde.init_value, torch.tensor([0.])]),
+                         2,
+                         2,
+                         'diag',
+                         None,
+                         base_sde.simulation_method)
+        self.base_sde = base_sde
+
+    def drift(self, t, x):
+        return torch.stack([self.base_sde.drift(t, x[:, 0]), x[:, 0]], dim=1)
+
+    def diffusion(self, t, x):
+        return torch.stack([self.base_sde.diffusion(t, x[:, 0]), torch.zeros_like(x[:, 0])], dim=1)
+
+    def jumps(self, t, x, jumps):
+        return torch.stack([self.base_sde.jumps(t, x[:, 0], jumps[:, 0]), torch.zeros_like(x[:, 0])], dim=1)
+
+    def sample_jumps(self, size, device):
+        return self.base_sde.sample_jumps(size, device)
+
+    def jump_mean(self):
+        return self.base_sde.jump_mean()
+
+    def jump_rate(self):
+        return self.base_sde.jump_rate()
