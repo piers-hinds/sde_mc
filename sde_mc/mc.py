@@ -117,7 +117,7 @@ def mc_simple(num_trials, sde_solver, payoff, discounter=None, bs=None, return_n
 
 
 def mc_control_variates(models, opt, solver, trials, steps, payoff, discounter, sim_bs=(1e5, 1e5),
-                        bs=(1000, 1000), epochs=10, print_losses=True, tol=0):
+                        bs=(1000, 1000), epochs=10, print_losses=True, tol=0, early_stopping=None):
     """Monte Carlo simulation of a functional of an SDE's terminal value with neural control variates
 
     Generates initial trajectories and payoffs on which regression is performed to find optimal control variates (a
@@ -168,10 +168,13 @@ def mc_control_variates(models, opt, solver, trials, steps, payoff, discounter, 
     train_sim_bs, test_sim_bs = sim_bs
     solver.num_steps = train_steps
 
+    if early_stopping is not None:
+        early_stopping.batch_size = bs[1]
+
     # Training
     train_start = time.time()
     sim_train_control_variates(models, opt, solver, train_trials, payoff, discounter, train_sim_bs, train_bs, epochs,
-                               print_losses, tol)
+                                print_losses, tol, early_stopping)
     train_end = time.time()
 
     # Inference
@@ -337,6 +340,7 @@ def simulate_adapted_data(trials, solver, payoff, discounter, bs=1000, inference
 
 
 def sim_train_control_variates(models, opt, solver, trials, payoff, discounter, sim_bs, bs, epochs=10,
-                               print_losses=True, tol=0):
+                               print_losses=True, tol=0, early_stopping=None):
     train_dl = simulate_data(trials, solver, payoff, discounter, bs=bs)
-    _, losses = train_diffusion_control_variate(models, opt, train_dl, solver, discounter, epochs, print_losses, tol)
+    _, losses = train_diffusion_control_variate(models, opt, train_dl, solver, discounter, epochs, print_losses, tol,
+                                                 early_stopping)
