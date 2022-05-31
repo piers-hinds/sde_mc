@@ -4,7 +4,7 @@ import torch
 from torch.utils.data import DataLoader
 from .varred import train_diffusion_control_variate, apply_diffusion_control_variate, train_adapted_control_variates, \
     apply_adapted_control_variates
-from .nets import NormalJumpsPathData, NormalPathData, AdaptedPathData
+from .nets import NormalJumpsPathData, NormalPathData, AdaptedPathData, Mlp
 from .helpers import partition, mc_estimates
 from .options import ConstantShortRate
 
@@ -344,3 +344,10 @@ def sim_train_control_variates(models, opt, solver, trials, payoff, discounter, 
     train_dl = simulate_data(trials, solver, payoff, discounter, bs=bs)
     _, losses = train_diffusion_control_variate(models, opt, train_dl, solver, discounter, epochs, print_losses, tol,
                                                  early_stopping)
+
+
+def sample_batch_cost(solver, option, discounter, hidden_size, device):
+    d = solver.sde.dim + 1; hs = hidden_size
+    bcv = Mlp(d, [d + hs, d + hs, d + hs], d - 1, batch_norm=False, batch_norm_init=True).to(device)
+    out = mc_apply_cvs(bcv, solver, 500000, option, discounter, 100000, 1000)
+    return out.time_elapsed / (500000 / 1000)

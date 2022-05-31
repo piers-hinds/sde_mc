@@ -195,5 +195,3 @@ def integrate_cv(normals, f_out, discounts, diffusion_struct, tol=0, time_interv
         return (normals * f_out * discounts).sum(-1).sum(-1)
     else:
         return ((normals * f_out).sum(-1) * discounts).sum(-1).sum(-1)
-
-
