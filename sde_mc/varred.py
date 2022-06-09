@@ -5,15 +5,16 @@ from .helpers import partition, remove_steps
 
 
 class EarlyStopping:
-    def __init__(self, eps, quantile, cost_batch):
+    def __init__(self, eps, quantile, cost_batch, alpha):
         self.eps = eps
         self.quantile = quantile
         self.cost_batch = cost_batch
+        self.alpha = alpha
         self.cost_epoch = None
         self.batch_size = None
 
     def threshold(self):
-        return (self.cost_epoch * self.eps ** 2 * self.batch_size) / (self.cost_batch * self.quantile ** 2)
+        return self.alpha * (self.cost_epoch * self.eps ** 2 * self.batch_size) / (self.cost_batch * self.quantile ** 2)
 
     def stop(self, delta_gamma):
         return delta_gamma < self.threshold()
@@ -130,12 +131,16 @@ def apply_adapted_control_variates(models, dl, solver, discounter, tol=0):
     return run_sum, run_sum_sq
 
 
-def train_adapted_control_variates(models, opt, dl, solver, discounter, epochs=10, print_losses=True, tol=0):
+def train_adapted_control_variates(models, opt, dl, solver, discounter, epochs=10, print_losses=True, tol=0,
+                                   early_stopping=None):
     trials, steps, dim = dl.dataset.paths.shape
     loss_arr = []
     f, g = models
+    epoch_total_cost = 0
+
     for epoch in range(epochs):
-        f.train();
+        start_epoch = time.time()
+        f.train()
         g.train()
         run_loss = 0
         for (paths, normals, left_paths, time_paths, jump_paths), payoffs in dl:
@@ -179,6 +184,18 @@ def train_adapted_control_variates(models, opt, dl, solver, discounter, epochs=1
                 loss_arr[epoch]) * 2 / np.sqrt(trials)))
         f.eval()
         g.eval()
+        end_epoch = time.time()
+        epoch_total_cost += end_epoch - start_epoch
+        # DECIDE HERE for early stopping - need external information eps, alpha, cost of one batch, var Gamma, cost to sample batch
+        if early_stopping is not None and epoch > 0:
+            # Set values here
+            delta_gamma = loss_arr[epoch - 1] - loss_arr[epoch]
+            early_stopping.cost_epoch = epoch_total_cost / (epoch + 1)
+
+            print('dg: {:.5f}    thresh: {:.5f}     time: {:.5f}'.format(delta_gamma, early_stopping.threshold(),
+                                                                         early_stopping.cost_epoch))
+            if early_stopping.stop(delta_gamma):
+                break
     return loss_arr
 
 

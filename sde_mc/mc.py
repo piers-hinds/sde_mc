@@ -236,7 +236,7 @@ def mc_apply_cvs(models, solver, trials, payoff, discounter, sim_bs=1e5, bs=1000
 
 
 def mc_adaptive_cv(models, opt, solver, trials, steps, payoff, discounter, sim_bs=(1e4, 1e4), bs=(1000, 1000),
-                   epochs=10, print_losses=True, pre_trained=False, tol=0):
+                   epochs=10, print_losses=True, pre_trained=False, tol=0, early_stopping=None):
     """Monte Carlo simulation of a functional of an SDE's terminal value with neural control variates
 
         Generates initial trajectories and payoffs on which regression is performed to find optimal control variates (a
@@ -287,12 +287,15 @@ def mc_adaptive_cv(models, opt, solver, trials, steps, payoff, discounter, sim_b
     train_bs, test_bs = bs
     train_sim_bs, test_sim_bs = sim_bs
     solver.num_steps = train_steps
+    if early_stopping is not None:
+        early_stopping.batch_size = bs[1]
 
     # Training
     train_start = time.time()
     if not pre_trained:
         train_dataloader = simulate_adapted_data(train_trials, solver, payoff, discounter, bs=train_bs)
-        _ = train_adapted_control_variates(models, opt, train_dataloader, solver, discounter, epochs, print_losses, tol)
+        _ = train_adapted_control_variates(models, opt, train_dataloader, solver, discounter, epochs, print_losses, tol,
+                                           early_stopping=early_stopping)
     train_end = time.time()
     train_time = train_end - train_start
 
@@ -313,7 +316,7 @@ def mc_adaptive_cv(models, opt, solver, trials, steps, payoff, discounter, sim_b
     sd = var.sqrt() / torch.tensor(test_trials).sqrt()
     end_test = time.time()
     test_time = end_test - start_test
-    return MCStatistics(mn, sd, train_time+test_time)
+    return MCStatistics(mn, sd, train_time + test_time)
 
 
 def simulate_data(trials, solver, payoff, discounter, bs=1000, inference=False):
