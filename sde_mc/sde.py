@@ -377,7 +377,7 @@ class Merton(LogNormalJumpsSde):
 
 class AsianWrapper(Sde):
     """Wraps an existing 1-D SDE object and computes the integral of the process over time - for Asian options"""
-    
+
     def __init__(self, base_sde):
         super().__init__(torch.cat([base_sde.init_value, torch.tensor([0.])]),
                          2,

@@ -23,6 +23,10 @@ class BlackScholesEuroCall(Problem):
         option = EuroCall(strike)
         super().__init__(solver, csr, option)
 
+    @classmethod
+    def default_params(cls, device):
+        return BlackScholesEuroCall(0.02, 0.3, 1, 1, 3, 1000, device)
+
 
 class HestonEuroCall(Problem):
     def __init__(self, r, kappa, theta, xi, rho, spot, v0, strike, maturity, steps, device):
@@ -31,3 +35,7 @@ class HestonEuroCall(Problem):
         csr = ConstantShortRate(r)
         option = EuroCall(strike)
         super().__init__(solver, csr, option)
+
+    @classmethod
+    def default_params(cls, device):
+        return HestonEuroCall(0.02, 0.25, 0.5, 0.3, -0.3, 1, 0.15, 1, 3, 1000, device)
