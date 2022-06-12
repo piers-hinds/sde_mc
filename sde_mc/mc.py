@@ -348,9 +348,14 @@ def simulate_adapted_data(trials, solver, payoff, discounter, bs=1000, inference
 
 def sim_train_control_variates(models, opt, solver, trials, payoff, discounter, sim_bs, bs, epochs=10,
                                print_losses=True, tol=0, early_stopping=None):
-    train_dl = simulate_data(trials, solver, payoff, discounter, bs=bs)
-    _, losses = train_diffusion_control_variate(models, opt, train_dl, solver, discounter, epochs, print_losses, tol,
-                                                 early_stopping)
+    if solver.has_jumps:
+        train_dl = simulate_adapted_data(trials, solver, payoff, discounter, bs=bs)
+        _, losses = train_adapted_control_variates(models, opt, train_dl, solver, discounter, epochs, print_losses,
+                                                   tol, early_stopping)
+    else:
+        train_dl = simulate_data(trials, solver, payoff, discounter, bs=bs)
+        _, losses = train_diffusion_control_variate(models, opt, train_dl, solver, discounter, epochs, print_losses,
+                                                    tol, early_stopping)
 
 
 def sample_batch_cost(solver, option, discounter, hidden_size, device):
