@@ -39,7 +39,7 @@ class MCStatistics:
     def __str__(self):
         """Prints the mean, 95% confidence interval, and time taken
         """
-        return 'Mean: {:.6f}  +/- {:.6f}     Time taken (s): {:.2f}'.format(self.sample_mean, self.sample_std * 2,
+        return 'Mean: {:.6f}  +/- {:.6f}     Time taken (s): {:.2f}'.format(self.sample_mean, self.sample_std * 1.96,
                                                                             self.time_elapsed)
 
 
