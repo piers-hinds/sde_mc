@@ -12,7 +12,7 @@ from .options import ConstantShortRate
 class MCStatistics:
     """A class to store relevant Monte Carlo statistics"""
 
-    def __init__(self, sample_mean, sample_std, time_elapsed, paths=None, payoffs=None, normals=None):
+    def __init__(self, sample_mean, sample_std, time_elapsed, num_trials, paths=None, payoffs=None, normals=None):
         """
         :param sample_mean: torch.tensor
             The mean of the samples
@@ -23,6 +23,9 @@ class MCStatistics:
         :param time_elapsed: float
             The total time taken for the MC simulation
 
+        :param num_trials: int
+            The number of MC simulations
+
         :param paths: torch.tensor, default = None
             The sample paths generated from the SDE
 
@@ -32,6 +35,7 @@ class MCStatistics:
         self.sample_mean = sample_mean.item()
         self.sample_std = sample_std.item()
         self.time_elapsed = time_elapsed
+        self.num_trials = num_trials
         self.paths = paths
         self.payoffs = payoffs
         self.normals = normals
@@ -90,7 +94,7 @@ def mc_simple(num_trials, sde_solver, payoff, discounter=None, bs=None, return_n
         end = time.time()
         tt = end - start
 
-        return MCStatistics(mn, sd, tt, out, payoffs, normals)
+        return MCStatistics(mn, sd, tt, num_trials, out, payoffs, normals)
     else:
         remaining_trials = num_trials
         sample_sum, sample_sum_sq = 0.0, 0.0
@@ -113,7 +117,7 @@ def mc_simple(num_trials, sde_solver, payoff, discounter=None, bs=None, return_n
         sd = torch.sqrt((sample_sum_sq/num_trials - mn**2) * (num_trials / (num_trials-1))) / np.sqrt(num_trials)
         end = time.time()
         tt = end-start
-        return MCStatistics(mn, sd, tt)
+        return MCStatistics(mn, sd, tt, num_trials)
 
 
 def mc_control_variates(models, opt, solver, trials, steps, payoff, discounter, sim_bs=(1e5, 1e5),
@@ -232,7 +236,7 @@ def mc_apply_cvs(models, solver, trials, payoff, discounter, sim_bs=1e5, bs=1000
     sd = var.sqrt() / torch.tensor(trials).sqrt()
     end_test = time.time()
     test_time = end_test - start_test
-    return MCStatistics(mn, sd, test_time)
+    return MCStatistics(mn, sd, test_time, trials)
 
 
 def mc_adaptive_cv(models, opt, solver, trials, steps, payoff, discounter, sim_bs=(1e4, 1e4), bs=(1000, 1000),
@@ -316,7 +320,7 @@ def mc_adaptive_cv(models, opt, solver, trials, steps, payoff, discounter, sim_b
     sd = var.sqrt() / torch.tensor(test_trials).sqrt()
     end_test = time.time()
     test_time = end_test - start_test
-    return MCStatistics(mn, sd, train_time + test_time)
+    return MCStatistics(mn, sd, train_time + test_time, test_trials)
 
 
 def simulate_data(trials, solver, payoff, discounter, bs=1000, inference=False):
