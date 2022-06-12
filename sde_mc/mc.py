@@ -333,7 +333,7 @@ def simulate_data(trials, solver, payoff, discounter, bs=1000, inference=False):
     paths, normals = mc_stats.paths, mc_stats.normals
     payoffs = mc_stats.payoffs
     dset = NormalPathData(paths, payoffs, normals)
-    return DataLoader(dset, batch_size=bs, shuffle=not inference, drop_last=not inference)
+    return DataLoader(dset, batch_size=int(bs), shuffle=not inference, drop_last=not inference)
 
 
 def simulate_adapted_data(trials, solver, payoff, discounter, bs=1000, inference=False):
@@ -343,7 +343,7 @@ def simulate_adapted_data(trials, solver, payoff, discounter, bs=1000, inference
         payoffs = mc_stats.payoffs
         dset = AdaptedPathData(paths[:, :total_steps+1], payoffs, normals[:, :total_steps], left_paths[:, :total_steps+1],
                                        time_paths[:, :total_steps+1], jump_paths[:, :total_steps+1], total_steps)
-    return DataLoader(dset, batch_size=bs, shuffle=not inference, drop_last=not inference)
+    return DataLoader(dset, batch_size=int(bs), shuffle=not inference, drop_last=not inference)
 
 
 def sim_train_control_variates(models, opt, solver, trials, payoff, discounter, sim_bs, bs, epochs=10,
