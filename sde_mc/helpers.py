@@ -97,3 +97,16 @@ def get_corr_matrix(rhos):
     except:
         raise RuntimeError('Matrix is not positive semidefinite')
     return corr_matrix
+
+
+def ceil_mult(x, n):
+    """Returns smallest multiple of n greater than or equal to x
+
+    :param x: float
+
+    :param n: int
+
+    :return: int
+    """
+    factor = float(x) / n
+    return int(np.ceil(factor) * n)
