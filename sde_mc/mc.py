@@ -352,7 +352,7 @@ def sim_train_control_variates(models, opt, solver, trials, payoff, discounter, 
                                print_losses=True, tol=0, early_stopping=None):
     if solver.has_jumps:
         train_dl = simulate_adapted_data(trials, solver, payoff, discounter, bs=bs)
-        _, losses = train_adapted_control_variates(models, opt, train_dl, solver, discounter, epochs, print_losses,
+        losses = train_adapted_control_variates(models, opt, train_dl, solver, discounter, epochs, print_losses,
                                                    tol, early_stopping)
     else:
         train_dl = simulate_data(trials, solver, payoff, discounter, bs=bs)
