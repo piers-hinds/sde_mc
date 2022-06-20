@@ -360,11 +360,9 @@ def sim_train_control_variates(models, opt, solver, trials, payoff, discounter, 
                                                     tol, early_stopping)
 
 
-def sample_batch_cost(solver, option, discounter, hidden_size, device):
-    d = solver.sde.dim + 1; hs = hidden_size
-    bcv = Mlp(d, [d + hs, d + hs, d + hs], d - 1, batch_norm=False, batch_norm_init=True).to(device)
-    out = mc_apply_cvs(bcv, solver, 500000, option, discounter, 100000, 1000)
-    return out.time_elapsed / (500000 / 1000)
+def sample_batch_cost(solver, option, discounter, models, trials, bs, nn_bs):
+    out = mc_apply_cvs(models, solver, trials, option, discounter, bs, nn_bs)
+    return out.time_elapsed / (trials / nn_bs)
 
 
 def find_num_trials(problem, eps, models=None, init_trials=1e5):
