@@ -5,7 +5,7 @@ from torch.utils.data import DataLoader
 from .varred import train_diffusion_control_variate, apply_diffusion_control_variate, train_adapted_control_variates, \
     apply_adapted_control_variates
 from .nets import NormalJumpsPathData, NormalPathData, AdaptedPathData, Mlp
-from .helpers import partition, mc_estimates
+from .helpers import partition, mc_estimates, ceil_mult
 from .options import ConstantShortRate
 
 
@@ -365,3 +365,38 @@ def sample_batch_cost(solver, option, discounter, hidden_size, device):
     bcv = Mlp(d, [d + hs, d + hs, d + hs], d - 1, batch_norm=False, batch_norm_init=True).to(device)
     out = mc_apply_cvs(bcv, solver, 500000, option, discounter, 100000, 1000)
     return out.time_elapsed / (500000 / 1000)
+
+
+def find_num_trials(problem, eps, models=None, init_trials=1e5):
+    """Finds number of trials needed to reach tolerance level eps"""
+    if models is None:
+        mc_stats = mc_simple(init_trials, problem.solver, problem.payoff, problem.discounter)
+    else:
+        mc_stats = mc_apply_cvs(models, problem.solver, init_trials, problem.payoff, problem.discounter, init_trials)
+    ratio = (mc_stats.sample_std * 1.96 / eps) ** 2
+    trials = np.ceil(ratio * init_trials)
+    return int(trials)
+
+
+def run_mc(problem, eps, bs=1e5, init_trials=1e5):
+    trials = find_num_trials(problem, eps, None, init_trials)
+    return mc_simple(trials, problem.solver, problem.payoff, problem.discounter, bs=bs)
+
+
+def run_cv_mc(problem, models, opt, eps, train_size, step_factor=30, bs=1e5, nn_bs=1e3, epochs=10, early_stopping=None,
+              print_losses=True, init_trials=1e5):
+    steps = problem.solver.num_steps
+    problem.solver.num_steps = int(np.ceil(steps / step_factor))
+    train_time_start = time.time()
+    sim_train_control_variates(models, opt, problem.solver, train_size, problem.payoff, problem.discounter,
+                               bs, nn_bs, epochs, print_losses, 0, early_stopping)
+    train_time_end = time.time()
+
+    problem.solver.num_steps = steps
+    trials = find_num_trials(problem, eps, models, init_trials)
+    trials = ceil_mult(trials, bs)
+    print(trials)
+
+    mc_stats = mc_apply_cvs(models, problem.solver, trials, problem.payoff, problem.discounter, bs)
+    mc_stats.time_elapsed += train_time_end - train_time_start
+    return mc_stats
