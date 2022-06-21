@@ -402,5 +402,6 @@ def run_cv_mc(problem, models, opt, eps, train_size, step_factor=30, bs=1e5, nn_
     print(trials)
 
     mc_stats = mc_apply_cvs(models, problem.solver, trials, problem.payoff, problem.discounter, bs)
+    test_time = mc_stats.time_elapsed
     mc_stats.time_elapsed += train_time_end - train_time_start
-    return mc_stats
+    return mc_stats, train_time_end - train_time_start, test_time
