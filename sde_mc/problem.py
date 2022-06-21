@@ -14,6 +14,9 @@ class Problem(ABC):
     def dim(self):
         return self.solver.sde.dim
 
+    def set_steps(self, steps):
+        self.solver.num_steps = steps
+
 
 class BlackScholesEuroCall(Problem):
     def __init__(self, r, sigma, spot, strike, maturity, steps, device):
