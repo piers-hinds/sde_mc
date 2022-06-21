@@ -3,16 +3,16 @@ import numpy as np
 import torch
 from torch.utils.data import DataLoader
 from .varred import train_diffusion_control_variate, apply_diffusion_control_variate, train_adapted_control_variates, \
-    apply_adapted_control_variates
+    apply_adapted_control_variates, EarlyStopping
 from .nets import NormalJumpsPathData, NormalPathData, AdaptedPathData, Mlp
-from .helpers import partition, mc_estimates
+from .helpers import partition, mc_estimates, ceil_mult
 from .options import ConstantShortRate
 
 
 class MCStatistics:
     """A class to store relevant Monte Carlo statistics"""
 
-    def __init__(self, sample_mean, sample_std, time_elapsed, paths=None, payoffs=None, normals=None):
+    def __init__(self, sample_mean, sample_std, time_elapsed, num_trials, paths=None, payoffs=None, normals=None):
         """
         :param sample_mean: torch.tensor
             The mean of the samples
@@ -23,6 +23,9 @@ class MCStatistics:
         :param time_elapsed: float
             The total time taken for the MC simulation
 
+        :param num_trials: int
+            The number of MC simulations
+
         :param paths: torch.tensor, default = None
             The sample paths generated from the SDE
 
@@ -32,6 +35,7 @@ class MCStatistics:
         self.sample_mean = sample_mean.item()
         self.sample_std = sample_std.item()
         self.time_elapsed = time_elapsed
+        self.num_trials = num_trials
         self.paths = paths
         self.payoffs = payoffs
         self.normals = normals
@@ -39,8 +43,10 @@ class MCStatistics:
     def __str__(self):
         """Prints the mean, 95% confidence interval, and time taken
         """
-        return 'Mean: {:.6f}  +/- {:.6f}     Time taken (s): {:.2f}'.format(self.sample_mean, self.sample_std * 2,
-                                                                            self.time_elapsed)
+        return 'Mean: {:.6f}  +/- {:.6f}    Time taken (s): {:.2f}    N: {:.2E}'.format(self.sample_mean,
+                                                                                        self.sample_std * 1.96,
+                                                                                        self.time_elapsed,
+                                                                                        self.num_trials)
 
 
 def mc_simple(num_trials, sde_solver, payoff, discounter=None, bs=None, return_normals=False, payoff_time='terminal'):
@@ -90,7 +96,7 @@ def mc_simple(num_trials, sde_solver, payoff, discounter=None, bs=None, return_n
         end = time.time()
         tt = end - start
 
-        return MCStatistics(mn, sd, tt, out, payoffs, normals)
+        return MCStatistics(mn, sd, tt, num_trials, out, payoffs, normals)
     else:
         remaining_trials = num_trials
         sample_sum, sample_sum_sq = 0.0, 0.0
@@ -113,7 +119,7 @@ def mc_simple(num_trials, sde_solver, payoff, discounter=None, bs=None, return_n
         sd = torch.sqrt((sample_sum_sq/num_trials - mn**2) * (num_trials / (num_trials-1))) / np.sqrt(num_trials)
         end = time.time()
         tt = end-start
-        return MCStatistics(mn, sd, tt)
+        return MCStatistics(mn, sd, tt, num_trials)
 
 
 def mc_control_variates(models, opt, solver, trials, steps, payoff, discounter, sim_bs=(1e5, 1e5),
@@ -232,7 +238,7 @@ def mc_apply_cvs(models, solver, trials, payoff, discounter, sim_bs=1e5, bs=1000
     sd = var.sqrt() / torch.tensor(trials).sqrt()
     end_test = time.time()
     test_time = end_test - start_test
-    return MCStatistics(mn, sd, test_time)
+    return MCStatistics(mn, sd, test_time, trials)
 
 
 def mc_adaptive_cv(models, opt, solver, trials, steps, payoff, discounter, sim_bs=(1e4, 1e4), bs=(1000, 1000),
@@ -316,7 +322,7 @@ def mc_adaptive_cv(models, opt, solver, trials, steps, payoff, discounter, sim_b
     sd = var.sqrt() / torch.tensor(test_trials).sqrt()
     end_test = time.time()
     test_time = end_test - start_test
-    return MCStatistics(mn, sd, train_time + test_time)
+    return MCStatistics(mn, sd, train_time + test_time, test_trials)
 
 
 def simulate_data(trials, solver, payoff, discounter, bs=1000, inference=False):
@@ -329,7 +335,7 @@ def simulate_data(trials, solver, payoff, discounter, bs=1000, inference=False):
     paths, normals = mc_stats.paths, mc_stats.normals
     payoffs = mc_stats.payoffs
     dset = NormalPathData(paths, payoffs, normals)
-    return DataLoader(dset, batch_size=bs, shuffle=not inference, drop_last=not inference)
+    return DataLoader(dset, batch_size=int(bs), shuffle=not inference, drop_last=not inference)
 
 
 def simulate_adapted_data(trials, solver, payoff, discounter, bs=1000, inference=False):
@@ -339,18 +345,62 @@ def simulate_adapted_data(trials, solver, payoff, discounter, bs=1000, inference
         payoffs = mc_stats.payoffs
         dset = AdaptedPathData(paths[:, :total_steps+1], payoffs, normals[:, :total_steps], left_paths[:, :total_steps+1],
                                        time_paths[:, :total_steps+1], jump_paths[:, :total_steps+1], total_steps)
-    return DataLoader(dset, batch_size=bs, shuffle=not inference, drop_last=not inference)
+    return DataLoader(dset, batch_size=int(bs), shuffle=not inference, drop_last=not inference)
 
 
 def sim_train_control_variates(models, opt, solver, trials, payoff, discounter, sim_bs, bs, epochs=10,
                                print_losses=True, tol=0, early_stopping=None):
-    train_dl = simulate_data(trials, solver, payoff, discounter, bs=bs)
-    _, losses = train_diffusion_control_variate(models, opt, train_dl, solver, discounter, epochs, print_losses, tol,
-                                                 early_stopping)
+    if solver.has_jumps:
+        train_dl = simulate_adapted_data(trials, solver, payoff, discounter, bs=bs)
+        losses = train_adapted_control_variates(models, opt, train_dl, solver, discounter, epochs, print_losses,
+                                                   tol, early_stopping)
+    else:
+        train_dl = simulate_data(trials, solver, payoff, discounter, bs=bs)
+        _, losses = train_diffusion_control_variate(models, opt, train_dl, solver, discounter, epochs, print_losses,
+                                                    tol, early_stopping)
 
 
-def sample_batch_cost(solver, option, discounter, hidden_size, device):
-    d = solver.sde.dim + 1; hs = hidden_size
-    bcv = Mlp(d, [d + hs, d + hs, d + hs], d - 1, batch_norm=False, batch_norm_init=True).to(device)
-    out = mc_apply_cvs(bcv, solver, 500000, option, discounter, 100000, 1000)
-    return out.time_elapsed / (500000 / 1000)
+def sample_batch_cost(solver, option, discounter, models, trials, bs, nn_bs):
+    out = mc_apply_cvs(models, solver, trials, option, discounter, bs, nn_bs)
+    return out.time_elapsed / (trials / nn_bs)
+
+
+def find_num_trials(problem, eps, models=None, init_trials=1e5):
+    """Finds number of trials needed to reach tolerance level eps"""
+    if models is None:
+        mc_stats = mc_simple(init_trials, problem.solver, problem.payoff, problem.discounter)
+    else:
+        mc_stats = mc_apply_cvs(models, problem.solver, init_trials, problem.payoff, problem.discounter, init_trials)
+    ratio = (mc_stats.sample_std * 1.96 / eps) ** 2
+    trials = np.ceil(ratio * init_trials)
+    return int(trials)
+
+
+def run_mc(problem, eps, bs=1e5, init_trials=1e5):
+    trials = find_num_trials(problem, eps, None, init_trials)
+    return mc_simple(trials, problem.solver, problem.payoff, problem.discounter, bs=bs)
+
+
+def run_cv_mc(problem, models, opt, eps, train_size, step_factor=30, bs=1e5, nn_bs=1e3, epochs=10, early_stopping=False,
+              print_losses=True, init_trials=1e5):
+    if early_stopping:
+        cost_batch = sample_batch_cost(problem.solver, problem.payoff, problem.discounter, models, bs, bs, nn_bs)
+        es = EarlyStopping(eps, 1.96, cost_batch, 1)
+        es.batch_size = nn_bs
+    else:
+        es = None
+    steps = problem.solver.num_steps
+    problem.solver.num_steps = int(np.ceil(steps / step_factor))
+    train_time_start = time.time()
+    sim_train_control_variates(models, opt, problem.solver, train_size, problem.payoff, problem.discounter,
+                               bs, nn_bs, epochs, print_losses, 0, es)
+    train_time_end = time.time()
+
+    problem.solver.num_steps = steps
+    trials = find_num_trials(problem, eps, models, init_trials)
+    trials = ceil_mult(trials, bs)
+    print(trials)
+
+    mc_stats = mc_apply_cvs(models, problem.solver, trials, problem.payoff, problem.discounter, bs)
+    mc_stats.time_elapsed += train_time_end - train_time_start
+    return mc_stats

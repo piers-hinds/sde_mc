@@ -1,7 +1,7 @@
 from abc import ABC
 import torch
-from .sde import Gbm, Heston
-from .solvers import EulerSolver
+from .sde import Gbm, Heston, Merton
+from .solvers import EulerSolver, JumpEulerSolver
 from .options import EuroCall, ConstantShortRate
 
 
@@ -26,6 +26,10 @@ class BlackScholesEuroCall(Problem):
         option = EuroCall(strike)
         super().__init__(solver, csr, option)
 
+    @classmethod
+    def default_params(cls, steps, device):
+        return BlackScholesEuroCall(0.02, 0.3, 1, 1, 3, steps, device)
+
 
 class HestonEuroCall(Problem):
     def __init__(self, r, kappa, theta, xi, rho, spot, v0, strike, maturity, steps, device):
@@ -34,3 +38,21 @@ class HestonEuroCall(Problem):
         csr = ConstantShortRate(r)
         option = EuroCall(strike)
         super().__init__(solver, csr, option)
+
+    @classmethod
+    def default_params(cls, steps, device):
+        return HestonEuroCall(0.02, 0.25, 0.5, 0.3, -0.3, 1, 0.15, 1, 3, steps, device)
+
+
+class MertonEuroCall(Problem):
+    def __init__(self, mu, sigma, rate, alpha, gamma, spot, strike, maturity, steps, device):
+        merton = Merton(mu, sigma, rate, alpha, gamma, torch.tensor([spot]), 1)
+        solver = JumpEulerSolver(merton, maturity, steps, device)
+        csr = ConstantShortRate(mu)
+        option = EuroCall(strike)
+        super().__init__(solver, csr, option)
+
+    @classmethod
+    def default_params(cls, steps, device):
+        return MertonEuroCall(0.02, 0.3, 2, -0.05, 0.3, 1, 1, 3, steps, device)
+
