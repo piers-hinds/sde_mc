@@ -1,5 +1,6 @@
 import torch
 import torch.nn as nn
+import torch.optim as optim
 from torch.utils.data import Dataset
 
 
@@ -204,3 +205,24 @@ class AdaptedPathData(Dataset):
     def __getitem__(self, idx):
         return (self.paths[idx], self.normals[idx], self.left_paths[idx],
                 self.time_paths[idx], self.jump_paths[idx]), self.payoffs[idx]
+
+
+def get_mlps(problem, num_layers, hidden_size, device):
+    d = problem.dim() + 1
+    brown_dim = problem.solver.sde.brown_dim
+    layers = [hidden_size + d for _ in range(num_layers)]
+    f = Mlp(d, layers, brown_dim, batch_norm=False, device=device)
+    if problem.solver.has_jumps:
+        g = Mlp(d, layers, d - 1, batch_norm=False, device=device)
+        return [f, g]
+    else:
+        return f
+
+
+def get_opt(models):
+    if isinstance(models, list):
+        opt = optim.Adam(list(models[0].parameters()) + list(models[1].parameters()))
+        return opt
+    else:
+        opt = optim.Adam(models.parameters())
+        return opt
