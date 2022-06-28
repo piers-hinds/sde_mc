@@ -63,8 +63,8 @@ def train_diffusion_control_variate(model, opt, dl, solver, discounter, epochs, 
             delta_gamma = loss_arr[epoch - 1] - loss_arr[epoch]
             early_stopping.cost_epoch = epoch_total_cost / (epoch + 1)
 
-            print('dg: {:.5f}    thresh: {:.5f}     time: {:.5f}'.format(delta_gamma, early_stopping.threshold(),
-                                                                         early_stopping.cost_epoch))
+            # print('dg: {:.5f}    thresh: {:.5f}     time: {:.5f}'.format(delta_gamma, early_stopping.threshold(),
+            #                                                              early_stopping.cost_epoch))
             if early_stopping.stop(delta_gamma):
                 break
 
@@ -192,8 +192,8 @@ def train_adapted_control_variates(models, opt, dl, solver, discounter, epochs=1
             delta_gamma = loss_arr[epoch - 1] - loss_arr[epoch]
             early_stopping.cost_epoch = epoch_total_cost / (epoch + 1)
 
-            print('dg: {:.5f}    thresh: {:.5f}     time: {:.5f}'.format(delta_gamma, early_stopping.threshold(),
-                                                                         early_stopping.cost_epoch))
+            # print('dg: {:.5f}    thresh: {:.5f}     time: {:.5f}'.format(delta_gamma, early_stopping.threshold(),
+            #                                                              early_stopping.cost_epoch))
             if early_stopping.stop(delta_gamma):
                 break
     return loss_arr
