@@ -188,6 +188,26 @@ class EuroCall(Option):
                            torch.tensor(0., dtype=spot.dtype, device=spot.device))
 
 
+class EuroPut(Option):
+    """European put option"""
+
+    def __init__(self, strike, log=False):
+        """
+        :param strike: float,
+            The strike price of the option
+
+        :param log: bool
+            If true, takes exponential of terminal value before applying payoff
+        """
+        super(EuroPut, self).__init__(log)
+        self.strike = strike
+
+    def __call__(self, x):
+        spot = torch.exp(x[:, 0]) if self.log else x[:, 0]
+        return torch.where(spot < self.strike, self.strike - spot,
+                           torch.tensor(0., dtype=spot.dtype, device=spot.device))
+
+
 class BinaryAoN(Option):
     """Binary asset-or-nothing option"""
 
