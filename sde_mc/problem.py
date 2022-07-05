@@ -71,7 +71,7 @@ class MertonEuroCall(Problem):
 
     @classmethod
     def default_params(cls, steps, device):
-        return MertonEuroCall(0.02, 0.3, 1, -0.05, 0.3, 1, 1, 3, steps, device)
+        return MertonEuroCall(0.02, 0.2, 1, -0.05, 0.3, 1, 1, 3, steps, device)
 
 
 class LevyRainbow(Problem):
