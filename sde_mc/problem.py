@@ -1,7 +1,7 @@
 from abc import ABC
 import torch
 from .sde import Gbm, Heston, Merton
-from .solvers import EulerSolver, JumpEulerSolver
+from .solvers import EulerSolver, JumpEulerSolver, HestonSolver
 from .options import EuroCall, ConstantShortRate, Rainbow
 from .levy import LevySde, ExpExampleLevy
 from .helpers import get_corr_matrix
@@ -45,13 +45,13 @@ class BlackScholesRainbow(Problem):
     @classmethod
     def default_params(cls, steps, device):
         corr_matrix = get_corr_matrix([0.7, 0.2, -0.3])
-        return BlackScholesRainbow(0.02, 0.3, 1, 1, 1, 3, corr_matrix, steps, device)
+        return BlackScholesRainbow(0.02, 0.3, 1, 1, 3, 3, corr_matrix, steps, device)
 
 
 class HestonEuroCall(Problem):
     def __init__(self, r, kappa, theta, xi, rho, spot, v0, strike, maturity, steps, device):
         heston = Heston(r, kappa, theta, xi, rho, torch.tensor([spot, v0]))
-        solver = EulerSolver(heston, maturity, steps, device)
+        solver = HestonSolver(heston, maturity, steps, device)
         csr = ConstantShortRate(r)
         option = EuroCall(strike)
         super().__init__(solver, csr, option)
