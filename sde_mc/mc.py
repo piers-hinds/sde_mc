@@ -381,10 +381,11 @@ def run_mc(problem, eps, bs=1e5, init_trials=1e5):
     return mc_simple(trials, problem.solver, problem.payoff, problem.discounter, bs=bs)
 
 
-def run_cv_mc(problem, models, opt, eps, train_size, step_factor=30, bs=1e5, nn_bs=1e3, epochs=10, early_stopping=False,
+def run_cv_mc(problem, models, opt, eps, train_size, step_factor=30, sim_bs=1e5, train_bs=1e3, nn_bs=1e3, epochs=10,
+              early_stopping=False,
               print_losses=True, init_trials=1e5):
     if early_stopping:
-        cost_batch = sample_batch_cost(problem.solver, problem.payoff, problem.discounter, models, bs, bs, nn_bs)
+        cost_batch = sample_batch_cost(problem.solver, problem.payoff, problem.discounter, models, sim_bs, sim_bs, nn_bs)
         es = EarlyStopping(eps, 1.96, cost_batch, 1)
         es.batch_size = nn_bs
     else:
@@ -393,14 +394,14 @@ def run_cv_mc(problem, models, opt, eps, train_size, step_factor=30, bs=1e5, nn_
     problem.solver.num_steps = int(np.ceil(steps / step_factor))
     train_time_start = time.time()
     sim_train_control_variates(models, opt, problem.solver, train_size, problem.payoff, problem.discounter,
-                               bs, nn_bs, epochs, print_losses, 0, es)
+                               sim_bs, train_bs, epochs, print_losses, 0, es)
     train_time_end = time.time()
 
     problem.solver.num_steps = steps
     trials = find_num_trials(problem, eps, models, init_trials)
-    trials = ceil_mult(trials, bs)
+    trials = ceil_mult(trials, sim_bs)
 
-    mc_stats = mc_apply_cvs(models, problem.solver, trials, problem.payoff, problem.discounter, bs, nn_bs)
+    mc_stats = mc_apply_cvs(models, problem.solver, trials, problem.payoff, problem.discounter, sim_bs, nn_bs)
     test_time = mc_stats.time_elapsed
     mc_stats.time_elapsed += train_time_end - train_time_start
     return mc_stats, train_time_end - train_time_start, test_time
