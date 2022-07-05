@@ -118,4 +118,4 @@ class LevyBestOf(Problem):
 
     @classmethod
     def default_params(cls, steps, device):
-        return LevyBestOf(1, 1, 0.5, 2, 0.02, 0.3, 0.2, 0.001, 4, 1, 1, 3, steps, device)
+        return LevyBestOf(1, 1, 0.2, 2, 0.02, 0.3, 0.2, 0.001, 4, 1, 1, 3, steps, device)
