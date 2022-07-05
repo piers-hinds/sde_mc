@@ -378,7 +378,8 @@ def find_num_trials(problem, eps, models=None, init_trials=1e5):
 
 def run_mc(problem, eps, bs=1e5, init_trials=1e5):
     trials = find_num_trials(problem, eps, None, init_trials)
-    return mc_simple(trials, problem.solver, problem.payoff, problem.discounter, bs=bs)
+    payoff_time = 'adapted' if problem.solver.has_jumps else 'terminal'
+    return mc_simple(trials, problem.solver, problem.payoff, problem.discounter, bs=bs, payoff_time=payoff_time)
 
 
 def run_cv_mc(problem, models, opt, eps, train_size, step_factor=30, sim_bs=1e5, train_bs=1e3, nn_bs=1e3, epochs=10,
