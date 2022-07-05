@@ -399,7 +399,7 @@ def run_cv_mc(problem, models, opt, eps, train_size, step_factor=30, sim_bs=1e5,
 
     problem.solver.num_steps = steps
     trials = find_num_trials(problem, eps, models, init_trials)
-    trials = ceil_mult(trials, sim_bs)
+    trials = ceil_mult(trials, nn_bs)
 
     mc_stats = mc_apply_cvs(models, problem.solver, trials, problem.payoff, problem.discounter, sim_bs, nn_bs)
     test_time = mc_stats.time_elapsed
