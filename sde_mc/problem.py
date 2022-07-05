@@ -71,7 +71,7 @@ class MertonEuroCall(Problem):
 
     @classmethod
     def default_params(cls, steps, device):
-        return MertonEuroCall(0.02, 0.3, 2, -0.05, 0.3, 1, 1, 3, steps, device)
+        return MertonEuroCall(0.02, 0.3, 1, -0.05, 0.3, 1, 1, 3, steps, device)
 
 
 class LevyRainbow(Problem):
@@ -94,7 +94,7 @@ class LevyCall(Problem):
     def __init__(self, c_minus, c_plus, alpha, mu, r, sigma, f, epsilon, spot, strike, maturity, steps, device):
 
         exptest = ExpExampleLevy(c_minus, c_plus, alpha, mu, r, sigma, f, epsilon, 1)
-        expsde = LevySde(exptest, torch.tesnor([spot]), device=device)
+        expsde = LevySde(exptest, torch.tensor([spot]), device=device)
         solver = JumpEulerSolver(expsde, maturity, steps, device=device)
         csr = ConstantShortRate(r)
         option = EuroCall(strike)
