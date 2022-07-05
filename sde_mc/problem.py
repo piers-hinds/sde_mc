@@ -2,7 +2,7 @@ from abc import ABC
 import torch
 from .sde import Gbm, Heston, Merton
 from .solvers import EulerSolver, JumpEulerSolver, HestonSolver
-from .options import EuroCall, ConstantShortRate, Rainbow
+from .options import EuroCall, ConstantShortRate, Rainbow, BestOf
 from .levy import LevySde, ExpExampleLevy
 from .helpers import get_corr_matrix
 
@@ -88,3 +88,34 @@ class LevyRainbow(Problem):
     @classmethod
     def default_params(cls, steps, device):
         return LevyRainbow(1, 1, 0.5, 2, 0.02, 0.3, 0.2, 0.001, 2, 1, 1, 3, steps, device)
+
+
+class LevyCall(Problem):
+    def __init__(self, c_minus, c_plus, alpha, mu, r, sigma, f, epsilon, spot, strike, maturity, steps, device):
+
+        exptest = ExpExampleLevy(c_minus, c_plus, alpha, mu, r, sigma, f, epsilon, 1)
+        expsde = LevySde(exptest, torch.tesnor([spot]), device=device)
+        solver = JumpEulerSolver(expsde, maturity, steps, device=device)
+        csr = ConstantShortRate(r)
+        option = EuroCall(strike)
+        super().__init__(solver, csr, option)
+
+    @classmethod
+    def default_params(cls, steps, device):
+        return LevyCall(1, 1, 0.5, 2, 0.02, 0.3, 0.2, 0.001, 1, 1, 3, steps, device)
+
+
+class LevyBestOf(Problem):
+    def __init__(self, c_minus, c_plus, alpha, mu, r, sigma, f, epsilon, dim, spot, strike, maturity, steps, device):
+        if not torch.is_tensor(spot):
+            spot = torch.ones(dim) * spot
+        exptest = ExpExampleLevy(c_minus, c_plus, alpha, mu, r, sigma, f, epsilon, dim)
+        expsde = LevySde(exptest, spot, device=device)
+        solver = JumpEulerSolver(expsde, maturity, steps, device=device)
+        csr = ConstantShortRate(r)
+        option = BestOf(strike)
+        super().__init__(solver, csr, option)
+
+    @classmethod
+    def default_params(cls, steps, device):
+        return LevyBestOf(1, 1, 0.5, 2, 0.02, 0.3, 0.2, 0.001, 4, 1, 1, 3, steps, device)
