@@ -4,6 +4,7 @@ from .sde import Gbm, Heston, Merton
 from .solvers import EulerSolver, JumpEulerSolver
 from .options import EuroCall, ConstantShortRate, Rainbow
 from .levy import LevySde, ExpExampleLevy
+from .helpers import get_corr_matrix
 
 
 class Problem(ABC):
@@ -33,9 +34,9 @@ class BlackScholesEuroCall(Problem):
 
 
 class BlackScholesRainbow(Problem):
-    def __init__(self, r, sigma, spot, strike, maturity, dim, steps, device):
+    def __init__(self, r, sigma, spot, strike, maturity, dim, corr_matrix, steps, device):
         init_value = torch.ones(dim) * spot
-        gbm = Gbm(r, sigma, init_value, dim)
+        gbm = Gbm(r, sigma, init_value, dim, corr_matrix)
         solver = EulerSolver(gbm, maturity, steps, device)
         csr = ConstantShortRate(r)
         option = Rainbow(strike)
@@ -43,7 +44,8 @@ class BlackScholesRainbow(Problem):
 
     @classmethod
     def default_params(cls, steps, device):
-        return BlackScholesRainbow(0.02, 0.3, 1, 1, 3, 3, steps, device)
+        corr_matrix = get_corr_matrix([0.7, 0.2, -0.3])
+        return BlackScholesRainbow(0.02, 0.3, 1, 1, 1, 3, corr_matrix, steps, device)
 
 
 class HestonEuroCall(Problem):
