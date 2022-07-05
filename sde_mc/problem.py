@@ -32,6 +32,20 @@ class BlackScholesEuroCall(Problem):
         return BlackScholesEuroCall(0.02, 0.3, 1, 1, 3, steps, device)
 
 
+class BlackScholesRainbow(Problem):
+    def __init__(self, r, sigma, spot, strike, maturity, dim, steps, device):
+        init_value = torch.ones(dim) * spot
+        gbm = Gbm(r, sigma, init_value, dim)
+        solver = EulerSolver(gbm, maturity, steps, device)
+        csr = ConstantShortRate(r)
+        option = Rainbow(strike)
+        super().__init__(solver, csr, option)
+
+    @classmethod
+    def default_params(cls, steps, device):
+        return BlackScholesEuroCall(0.02, 0.3, 1, 1, 3, 3, steps, device)
+
+
 class HestonEuroCall(Problem):
     def __init__(self, r, kappa, theta, xi, rho, spot, v0, strike, maturity, steps, device):
         heston = Heston(r, kappa, theta, xi, rho, torch.tensor([spot, v0]))
