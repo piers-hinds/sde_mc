@@ -43,7 +43,7 @@ class BlackScholesRainbow(Problem):
 
     @classmethod
     def default_params(cls, steps, device):
-        return BlackScholesEuroCall(0.02, 0.3, 1, 1, 3, 3, steps, device)
+        return BlackScholesRainbow(0.02, 0.3, 1, 1, 3, 3, steps, device)
 
 
 class HestonEuroCall(Problem):
