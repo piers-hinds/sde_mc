@@ -156,81 +156,104 @@ def bs_asian_call(spot, strike, expiry, r, sigma):
 class Option(ABC):
     """Abstract base class for options"""
 
-    def __init__(self, log=False):
+    def __init__(self, log=False, discount=1):
         """
         :param log: bool
             If true, takes exponential of terminal value before applying payoff
         """
         self.log = log
+        self.discount = discount
+
+    def transform(self, x):
+        spot = torch.exp(x) if self.log else x
+        return self.discount * spot
 
     @abstractmethod
-    def __call__(self, x):
+    def payoff(self, x):
         pass
+
+    def __call__(self, x):
+        return self.payoff(self.transform(x))
 
 
 class EuroCall(Option):
     """European call option"""
 
-    def __init__(self, strike, log=False):
+    def __init__(self, strike, log=False, discount=1):
         """
         :param strike: float,
             The strike price of the option
 
         :param log: bool
             If true, takes exponential of terminal value before applying payoff
+
+        :param discount: float
+            Multiplicative factor to apply before payoff
         """
-        super(EuroCall, self).__init__(log)
+        super(EuroCall, self).__init__(log, discount)
         self.strike = strike
 
-    def __call__(self, x):
-        spot = torch.exp(x[:, 0]) if self.log else x[:, 0]
-        return torch.where(spot > self.strike, spot - self.strike,
-                           torch.tensor(0., dtype=spot.dtype, device=spot.device))
+    def payoff(self, x):
+        x = x[:, 0]
+        return torch.where(x > self.strike, x - self.strike,
+                           torch.tensor(0., dtype=x.dtype, device=x.device))
 
 
 class EuroPut(Option):
     """European put option"""
 
-    def __init__(self, strike, log=False):
+    def __init__(self, strike, log=False, discount=1):
         """
         :param strike: float,
             The strike price of the option
 
         :param log: bool
             If true, takes exponential of terminal value before applying payoff
+
+        :param discount: float
+            Multiplicative factor to apply before payoff
         """
-        super(EuroPut, self).__init__(log)
+        super(EuroPut, self).__init__(log, discount)
         self.strike = strike
 
-    def __call__(self, x):
-        spot = torch.exp(x[:, 0]) if self.log else x[:, 0]
-        return torch.where(spot < self.strike, self.strike - spot,
-                           torch.tensor(0., dtype=spot.dtype, device=spot.device))
+    def payoff(self, x):
+        x = x[:, 0]
+        return torch.where(x < self.strike, self.strike - x,
+                           torch.tensor(0., dtype=x.dtype, device=x.device))
 
 
 class BinaryAoN(Option):
     """Binary asset-or-nothing option"""
 
-    def __init__(self, strike, log=False):
-        super(BinaryAoN, self).__init__(log)
+    def __init__(self, strike, log=False, discount=1):
+        """
+        :param strike: float,
+            The strike price of the option
+
+        :param log: bool
+            If true, takes exponential of terminal value before applying payoff
+
+        :param discount: float
+            Multiplicative factor to apply before payoff
+        """
+        super(BinaryAoN, self).__init__(log, discount)
         self.strike = strike
 
-    def __call__(self, x):
-        spot = torch.exp(x[:, 0]) if self.log else x[:, 0]
-        return torch.where(spot >= self.strike, spot, torch.tensor(0, dtype=spot.dtype, device=spot.device))
+    def payoff(self, x):
+        x = x[:, 0]
+        return torch.where(x >= self.strike, x, torch.tensor(0, dtype=x.dtype, device=x.device))
 
 
 class Basket(Option):
     """Basket option"""
 
-    def __init__(self, strike, average_type='arithmetic', log=False):
+    def __init__(self, strike, average_type='arithmetic', log=False, discount=1):
         assert average_type in ['arithmetic', 'geometric']
-        super(Basket, self).__init__(log)
+        super(Basket, self).__init__(log, discount)
         self.strike = strike
         self.average_type = average_type
 
-    def __call__(self, x):
-        x = torch.exp(x) if self.log else x
+    def payoff(self, x):
         spot = x.mean(1) if self.average_type == 'arithmetic' else torch.exp(torch.log(x).mean(1))
         return torch.where(spot > self.strike, spot - self.strike, torch.tensor(0., dtype=spot.dtype,
                                                                                 device=spot.device))
@@ -239,12 +262,11 @@ class Basket(Option):
 class Rainbow(Option):
     """Rainbow option (call on max)"""
 
-    def __init__(self, strike, log=False):
-        super(Rainbow, self).__init__(log)
+    def __init__(self, strike, log=False, discount=1):
+        super(Rainbow, self).__init__(log, discount)
         self.strike = strike
 
-    def __call__(self, x):
-        x = torch.exp(x) if self.log else x
+    def payoff(self, x):
         spot = x.max(1).values
         return torch.where(spot > self.strike, spot - self.strike, torch.tensor(0., dtype=spot.dtype,
                                                                                 device=spot.device))
@@ -253,36 +275,35 @@ class Rainbow(Option):
 class Digital(Option):
     """Digital option"""
 
-    def __init__(self, strike, log=False):
-        super(Digital, self).__init__(log)
+    def __init__(self, strike, log=False, discount=1):
+        super(Digital, self).__init__(log, discount)
         self.strike = strike
 
-    def __call__(self, x):
-        spot = torch.exp(x[:, 0]) if self.log else x[:, 0]
-        return torch.where(spot > self.strike, torch.ones_like(spot), torch.zeros_like(spot))
+    def payoff(self, x):
+        x = x[:, 0]
+        return torch.where(x > self.strike, torch.ones_like(x), torch.zeros_like(x))
 
 
 class AsianCall(Option):
     """Asian call option"""
 
-    def __init__(self, time_interval, strike, log=False):
-        super().__init__(log=log)
+    def __init__(self, time_interval, strike, log=False, discount=1):
+        super().__init__(log, discount)
         self.time_interval = time_interval
         self.strike = strike
 
-    def __call__(self, x):
+    def payoff(self, x):
         spot = torch.exp(x[:, 1] / self.time_interval) if self.log else x[:, 1] / self.time_interval
         return torch.where(spot > self.strike, spot - self.strike,
                            torch.tensor(0., dtype=spot.dtype, device=spot.device))
 
 
 class HestonRainbow(Option):
-    def __init__(self, strike, log=False):
-        super(HestonRainbow, self).__init__(log)
+    def __init__(self, strike, log=False, discount=1):
+        super(HestonRainbow, self).__init__(log, discount)
         self.strike = strike
 
-    def __call__(self, x):
-        x = torch.exp(x) if self.log else x
+    def payoff(self, x):
         even_inds = torch.tensor([i for i in range(len(x[0])) if not i%2])
         x = torch.index_select(x, 1, even_inds)
         spot = x.max(1).values
@@ -291,12 +312,11 @@ class HestonRainbow(Option):
 
 
 class BestOf(Option):
-    def __init__(self, strike, log=False):
-        super(BestOf, self).__init__(log)
+    def __init__(self, strike, log=False, discount=1):
+        super(BestOf, self).__init__(log, discount)
         self.strike = strike
 
-    def __call__(self, x):
-        x = torch.exp(x) if self.log else x
+    def payoff(self, x):
         max_assets = torch.max(x, dim=1).values
         return torch.maximum(max_assets, self.strike * torch.ones_like(max_assets))
 

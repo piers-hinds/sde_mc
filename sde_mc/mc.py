@@ -7,6 +7,7 @@ from .varred import train_diffusion_control_variate, apply_diffusion_control_var
 from .nets import NormalJumpsPathData, NormalPathData, AdaptedPathData, Mlp
 from .helpers import partition, mc_estimates, ceil_mult
 from .options import ConstantShortRate
+import gc
 
 
 class MCStatistics:
@@ -397,6 +398,7 @@ def run_cv_mc(problem, models, opt, eps, train_size, step_factor=30, sim_bs=1e5,
     sim_train_control_variates(models, opt, problem.solver, train_size, problem.payoff, problem.discounter,
                                sim_bs, train_bs, epochs, print_losses, 0, es)
     train_time_end = time.time()
+    gc.collect()
 
     problem.solver.num_steps = steps
     trials = find_num_trials(problem, eps, models, init_trials)
