@@ -48,9 +48,12 @@ class SdeSolver(ABC):
     def step(self, t, x, h, corr_normals):
         pass
 
-    def sample_corr_normals(self, size, h):
+    def sample_corr_normals(self, size, h, corr=True):
         normals = torch.randn(size=size, device=self.device) * torch.sqrt(h)
-        return torch.matmul(self.lower_cholesky, normals).squeeze(-1)
+        if corr:
+            return torch.matmul(self.lower_cholesky, normals).squeeze(-1)
+        else:
+            return normals.squeeze(-1)
 
 
 class DiffusionSolver(SdeSolver):
