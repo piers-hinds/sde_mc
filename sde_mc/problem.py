@@ -92,17 +92,17 @@ class LevyRainbow(Problem):
 
 class LevyCall(Problem):
     def __init__(self, c_minus, c_plus, alpha, mu, r, sigma, f, epsilon, spot, strike, maturity, steps, device):
-
-        exptest = ExpExampleLevy(c_minus, c_plus, alpha, mu, r, sigma, f, epsilon, 1)
+        chol_corr = torch.tensor([[1.]], device=device)
+        exptest = ExampleLevy(c_minus, c_plus, alpha, mu, r, torch.tensor([sigma], device=device), torch.tensor([f], device=device), chol_corr, epsilon, 1)
         expsde = LevySde(exptest, torch.tensor([spot]), device=device)
         solver = JumpEulerSolver(expsde, maturity, steps, device=device)
         csr = ConstantShortRate(r)
-        option = EuroCall(strike)
+        option = EuroCall(strike, log=True, discount=csr(-maturity))
         super().__init__(solver, csr, option)
 
     @classmethod
     def default_params(cls, steps, device):
-        return LevyCall(1, 1, 0.5, 2, 0.02, 0.3, 0.2, 0.001, 1, 1, 3, steps, device)
+        return LevyCall(1, 1, 0.5, 2, 0.02, 0.2, 0.2, 0.001, 0, 1, 3, steps, device)
 
 
 class LevyBestOf(Problem):
