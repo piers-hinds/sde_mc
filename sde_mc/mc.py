@@ -366,19 +366,19 @@ def sample_batch_cost(solver, option, discounter, models, trials, bs, nn_bs):
     return out.time_elapsed / (trials / nn_bs)
 
 
-def find_num_trials(problem, eps, models=None, init_trials=1e5):
+def find_num_trials(problem, eps, models=None, init_trials=1e5, bs=1e5):
     """Finds number of trials needed to reach tolerance level eps"""
     if models is None:
-        mc_stats = mc_simple(init_trials, problem.solver, problem.payoff, problem.discounter)
+        mc_stats = mc_simple(init_trials, problem.solver, problem.payoff, problem.discounter, bs)
     else:
-        mc_stats = mc_apply_cvs(models, problem.solver, init_trials, problem.payoff, problem.discounter, init_trials)
+        mc_stats = mc_apply_cvs(models, problem.solver, init_trials, problem.payoff, problem.discounter, bs)
     ratio = (mc_stats.sample_std * 1.96 / eps) ** 2
     trials = np.ceil(ratio * init_trials)
     return int(trials)
 
 
 def run_mc(problem, eps, bs=1e5, init_trials=1e5):
-    trials = find_num_trials(problem, eps, None, init_trials)
+    trials = find_num_trials(problem, eps, None, init_trials, bs)
     payoff_time = 'adapted' if problem.solver.has_jumps else 'terminal'
     return mc_simple(trials, problem.solver, problem.payoff, problem.discounter, bs=bs, payoff_time=payoff_time)
 
@@ -401,7 +401,7 @@ def run_cv_mc(problem, models, opt, eps, train_size, step_factor=30, sim_bs=1e5,
     gc.collect()
 
     problem.solver.num_steps = steps
-    trials = find_num_trials(problem, eps, models, init_trials)
+    trials = find_num_trials(problem, eps, models, init_trials, sim_bs)
     trials = ceil_mult(trials, nn_bs)
 
     mc_stats = mc_apply_cvs(models, problem.solver, trials, problem.payoff, problem.discounter, sim_bs, nn_bs)
