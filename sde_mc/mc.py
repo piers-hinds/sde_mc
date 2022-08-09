@@ -368,8 +368,9 @@ def sample_batch_cost(solver, option, discounter, models, trials, bs, nn_bs):
 
 def find_num_trials(problem, eps, models=None, init_trials=1e5, bs=1e5):
     """Finds number of trials needed to reach tolerance level eps"""
+    payoff_time = 'adapted' if problem.solver.has_jumps else 'terminal'
     if models is None:
-        mc_stats = mc_simple(init_trials, problem.solver, problem.payoff, problem.discounter, bs)
+        mc_stats = mc_simple(init_trials, problem.solver, problem.payoff, problem.discounter, bs, payoff_time=payoff_time)
     else:
         mc_stats = mc_apply_cvs(models, problem.solver, init_trials, problem.payoff, problem.discounter, bs)
     ratio = (mc_stats.sample_std * 1.96 / eps) ** 2
