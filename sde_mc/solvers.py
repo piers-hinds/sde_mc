@@ -112,10 +112,8 @@ class JumpDiffusionSolver(SdeSolver):
         return torch.empty(size, device=self.device).exponential_(self.sde.jump_rate().sum()).cumsum(dim=1)
 
     def sample_one_jump(self, size):
-        jumps = self.sde.sample_jumps([size, self.sde.dim], self.device)
-        # Following line can be changed when rates are not all equal, use torch.Categorical
-        rand_dim = torch.randint(0, self.sde.dim, (size,), device=self.device)
-        return F.one_hot(rand_dim, num_classes=self.sde.dim) * jumps
+        jumps = self.sde.sample_jumps([size, 1], self.device).repeat(1, self.sde.dim)
+        return jumps
 
     def init_storage(self, bs, steps):
         paths = torch.zeros(size=(bs, steps + 1, self.sde.dim), device=self.device)
@@ -158,7 +156,10 @@ class JumpDiffusionSolver(SdeSolver):
             if self.sde.diffusion_struct == 'diag':
                 corr_normals = self.sample_corr_normals(x.shape + torch.Size([1]), h.unsqueeze(-1))
             else:
-                corr_normals = self.sample_corr_normals(x.shape + torch.Size([int(self.sde.brown_dim / self.sde.dim)]), h.unsqueeze(-1))
+                corr_normals = torch.stack([
+                                            self.sample_corr_normals(x.shape + torch.Size([1]), h.unsqueeze(-1)),
+                                            self.sample_corr_normals([x.shape[0], 1, 1], h.unsqueeze(-1), corr=False).repeat(1, x.shape[1])
+                                            ], dim=-1)
             x = self.step(t, x, dt, corr_normals)
             normals[:, total_steps - 1] = corr_normals
             left_paths[:, total_steps] = x

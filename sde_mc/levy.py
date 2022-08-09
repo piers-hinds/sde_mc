@@ -2,6 +2,7 @@ import torch
 import numpy as np
 from abc import abstractmethod
 from .sde import Sde
+from .helpers import get_jump_comp
 
 UNIFORM_TOL = 5.960464477539063e-08
 
@@ -65,8 +66,8 @@ class LevySde(Sde):
     """An Sde interface for a Levy-driven SDE which approximates small jumps with an additional diffusion
     component"""
 
-    def __init__(self, levy, init_value, scale_jump_rate=True, device='cpu', seed=1):
-        super(LevySde, self).__init__(init_value, levy.dim, levy.dim * 2, 'indep')
+    def __init__(self, levy, init_value, corr_matrix=None, scale_jump_rate=False, device='cpu', seed=1):
+        super(LevySde, self).__init__(init_value, levy.dim, levy.dim * 2, 'indep', corr_matrix)
         self.levy = levy
         self.scale_rate = scale_jump_rate
 
@@ -96,20 +97,24 @@ class LevySde(Sde):
 
 
 class ExampleLevy(Levy):
-    def __init__(self, c_plus, c_minus, alpha, mu, f, epsilon):
-        super(ExampleLevy, self).__init__(1, InverseCdf(c_minus, c_plus, mu, alpha, epsilon))
+    def __init__(self, c_plus, c_minus, alpha, mu, r, sigma, f, chol_corr, epsilon, dim):
+        super(ExampleLevy, self).__init__(dim, InverseCdf(c_minus, c_plus, mu, alpha, epsilon))
         self.cm = c_minus
         self.cp = c_plus
         self.alpha = alpha
         self.mu = mu
         self.f = f
+        self.sigma = sigma
         self.epsilon = epsilon
+        self.jump_comp = torch.tensor([get_jump_comp(c_plus, c_minus, alpha, mu, f[i].item()) for i in range(dim)], device=f.device)
+        self.sigma_matrix = torch.matmul(torch.diag(sigma), chol_corr)
+        self.row_sum_sq = (self.sigma_matrix**2).sum(-1)
 
     def drift(self, t, x):
-        return (- 1 - self.f * (1 / (self.mu) + 1 / (self.mu ** 2)) * (self.cp - self.cm)) * torch.ones_like(x)
+        return - 0.5 * self.row_sum_sq - self.jump_comp
 
     def diffusion(self, t, x):
-        return torch.zeros_like(x)
+        return self.sigma * torch.ones_like(x)
 
     def jumps(self, t, x, jumps):
         return self.f * jumps * torch.ones_like(x)
@@ -119,6 +124,9 @@ class ExampleLevy(Levy):
 
     def beta(self):
         return np.sqrt((self.cp + self.cm) * (self.epsilon ** (2 - self.alpha)) / (2 - self.alpha))
+
+    def jump_mean(self):
+        return 0
 
 
 class ExpExampleLevy(Levy):
