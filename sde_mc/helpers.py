@@ -1,5 +1,6 @@
 import torch
 import numpy as np
+from scipy.integrate import quad
 
 
 def partition(interval, steps, ends='right', device='cpu'):
@@ -110,3 +111,23 @@ def ceil_mult(x, n):
     """
     factor = float(x) / n
     return int(np.ceil(factor) * n)
+
+
+def get_jump_comp(c_plus, c_minus, alpha, mu, f):
+    def g(x):
+        return np.exp(f * x) - 1 - f * x
+
+    def q(x):
+        return np.exp(f * x) - 1
+
+    def tail(x):
+        return np.exp(-mu * (np.abs(x) - 1))
+
+    def inner(x):
+        return np.abs(x) ** (- alpha - 1)
+
+    i1 = quad(lambda x: c_minus * q(x) * tail(x), -np.inf, -1)[0]
+    i2 = quad(lambda x: c_minus * g(x) * inner(x), -1, 0)[0]
+    i3 = quad(lambda x: c_plus * g(x) * inner(x), 0, 1)[0]
+    i4 = quad(lambda x: c_plus * q(x) * tail(x), 1, np.inf)[0]
+    return i1 + i2 + i3 + i4
