@@ -3,7 +3,7 @@ import torch
 from .sde import Gbm, Heston, Merton
 from .solvers import EulerSolver, JumpEulerSolver, HestonSolver
 from .options import EuroCall, ConstantShortRate, Rainbow, BestOf
-from .levy import LevySde, ExpExampleLevy
+from .levy import LevySde, ExpExampleLevy, ExampleLevy
 from .helpers import get_corr_matrix
 
 
@@ -119,3 +119,32 @@ class LevyBestOf(Problem):
     @classmethod
     def default_params(cls, steps, device):
         return LevyBestOf(1, 1, 0.2, 2, 0.02, 0.3, 0.2, 0.001, 4, 1, 1, 3, steps, device)
+
+
+class LevyCallOnMax(Problem):
+    def __init__(self, c_minus, c_plus, alpha, mu, r, sigma, f, chol_corr, epsilon, dim, spot, strike, maturity, steps, device):
+        if not torch.is_tensor(spot):
+            spot = torch.ones(dim) * spot
+        levy = ExampleLevy(c_plus, c_minus, alpha, mu, r, sigma, f, chol_corr, epsilon, dim)
+        sde = LevySde(levy, spot, device=device)
+        solver = JumpEulerSolver(sde, maturity, steps, device=device)
+        csr = ConstantShortRate(r)
+        option = Rainbow(strike, log=True, discount=csr(-maturity))
+        super().__init__(solver, csr, option)
+
+    @classmethod
+    def default_params(cls, dim, steps, device):
+        if dim not in [2, 4]:
+            return 'No default parameters for dimension {:}'.format(dim)
+        if dim == 2:
+            corr_matrix = get_corr_matrix([0.4])
+            chol_corr = torch.linalg.cholesky(corr_matrix).to(device)
+            fs = torch.tensor([0.2, 0.2], device=device)
+            sigmas = torch.tensor([0.15, 0.15], device=device)
+            return LevyCallOnMax(1, 1, 0.5, 2, 0.02, sigmas, fs, chol_corr, 0.001, 2, 0, 1, 3, steps, device)
+        if dim == 4:
+            corr_matrix = get_corr_matrix([0.87, 0.94, 0.86, 0.87, 0.93, 0.96])
+            chol_corr = torch.linalg.cholesky(corr_matrix).to(device)
+            fs = torch.tensor([0.2, 0.15, 0.15, 0.1], device=device)
+            sigmas = torch.tensor([0.1, 0.1, 0.1, 0.1], device=device)
+            return LevyCallOnMax(1, 1, 0.5, 2, 0.02, sigmas, fs, chol_corr, 0.001, 4, 0, 1, 3, steps, device)
