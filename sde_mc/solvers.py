@@ -78,7 +78,7 @@ class DiffusionSolver(SdeSolver):
             corr_normals = self.sample_corr_normals(size=(bs, self.num_steps, self.sde.dim, 1), h=h)
         if self.sde.diffusion_struct == 'indep':
             corr_normals = self.sample_corr_normals(size=(bs, self.num_steps, self.sde.dim, int(self.sde.brown_dim /
-                                                          self.sde.dim)), h=h)
+                                                                                                self.sde.dim)), h=h)
 
         for i in range(self.num_steps):
             x = self.step(t, x, h, corr_normals[:, i])
@@ -86,6 +86,37 @@ class DiffusionSolver(SdeSolver):
                 paths[:, i + 1] = x
             t += h
         return paths, corr_normals
+
+    def multilevel_solve(self, bs, levels, return_normals=False):
+        bs = int(bs)
+        fine, coarse = levels
+        factor = int(fine / coarse)
+
+        h_fine = torch.tensor(self.time_interval / fine, device=self.device)
+        h_coarse = factor * h_fine
+        t = torch.tensor(0.0, device=self.device)
+        x_fine = self.sde.init_value.unsqueeze(0).repeat(bs, 1).to(self.device)
+        x_coarse = self.sde.init_value.unsqueeze(0).repeat(bs, 1).to(self.device)
+        paths_fine = self.init_storage(bs, fine)
+        paths_coarse = self.init_storage(bs, coarse)
+        paths_fine[:, 0] = x_fine
+        paths_coarse[:, 0] = x_coarse
+
+        if self.sde.diffusion_struct == 'diag':
+            corr_normals = self.sample_corr_normals(size=(bs, fine, self.sde.dim, 1), h=h_fine)
+        if self.sde.diffusion_struct == 'indep':
+            corr_normals = self.sample_corr_normals(size=(bs, fine, self.sde.dim, int(self.sde.brown_dim /
+                                                                                      self.sde.dim)), h=h_fine)
+
+        for i in range(coarse):
+            for j in range(factor):
+                x_fine = self.step(t, x_fine, h_fine, corr_normals[:, i * factor + j])
+                t += h_fine
+                paths_fine[:, i * factor + j + 1] = x_fine
+            x_coarse = self.step(t, x_coarse, h_coarse,
+                                 torch.sum(corr_normals[:, (i * factor):((i + 1) * factor)], dim=1))
+            paths_coarse[:, i + 1] = x_coarse
+        return (paths_fine, paths_coarse), corr_normals
 
 
 class EulerSolver(EulerScheme, DiffusionSolver):

@@ -58,7 +58,7 @@ def mc_multilevel(trials, levels, solver, payoff, discounter, bs=None):
         trials_remaining = trials[i + 1]
         while trials_remaining > 0:
             next_batch_size = min(trials_remaining, bs[i + 1])
-            (paths_fine, paths_coarse), _ = solver.multilevel_euler(next_batch_size, pair)
+            (paths_fine, paths_coarse), _ = solver.multilevel_solve(next_batch_size, pair)
             terminals = discounter(solver.time_interval) * (payoff(paths_fine[:, pair[0]]) -
                                                             payoff(paths_coarse[:, pair[1]]))
             run_sum += terminals.sum()
@@ -69,7 +69,7 @@ def mc_multilevel(trials, levels, solver, payoff, discounter, bs=None):
     total_sd = (vars / trial_numbers).sum().sqrt()
     total_mean = exps.sum()
     end = time.time()
-    return MCStatistics(total_mean, total_sd, end - start)
+    return MCStatistics(total_mean, total_sd, end - start, trials[-1])
 
 
 def get_optimal_trials(trials, levels, epsilon, solver, payoff, discounter):
@@ -85,11 +85,11 @@ def get_optimal_trials(trials, levels, epsilon, solver, payoff, discounter):
     vars[0] = var
 
     for i, pair in enumerate(pairs):
-        (paths_fine, paths_coarse), _ = solver.multilevel_euler(trials, pair)
+        (paths_fine, paths_coarse), _ = solver.multilevel_solve(trials, pair)
         terminals = discounter(solver.time_interval) * (payoff(paths_fine[:, pair[0]]) -
                                                         payoff(paths_coarse[:, pair[1]]))
         vars[i + 1] = terminals.var()
 
     sum_term = (vars / step_sizes).sqrt().sum()
-    optimal_trials = (2 / (epsilon * epsilon)) * (vars * step_sizes).sqrt() * sum_term
+    optimal_trials = (1.96**2 / (epsilon * epsilon)) * (vars * step_sizes).sqrt() * sum_term
     return optimal_trials.ceil().long().tolist()
