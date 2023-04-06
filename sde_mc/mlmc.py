@@ -1,7 +1,7 @@
 import torch
 import time
 from .helpers import mc_estimates
-from mc import MCStatistics
+from .mc import MCStatistics
 
 
 def mc_multilevel(trials, levels, solver, payoff, discounter, bs=None):
