@@ -75,6 +75,7 @@ def mc_multilevel(trials, levels, solver, payoff, discounter, bs=None):
 def get_optimal_trials(trials, levels, epsilon, solver, payoff, discounter):
     """Finds the optimal number of trials at each level for the MLMC method (for a given tolerance)"""
 
+    original_num_steps = solver.num_steps
     vars = torch.zeros(len(levels))
     pairs = [(levels[i + 1], levels[i]) for i in range(0, len(levels) - 1)]
     step_sizes = solver.time_interval / torch.tensor(levels)
@@ -83,6 +84,7 @@ def get_optimal_trials(trials, levels, epsilon, solver, payoff, discounter):
     discounted_payoffs = payoff(paths[:, solver.num_steps, :]) * discounter(solver.time_interval)
     var = discounted_payoffs.var()
     vars[0] = var
+    solver.num_steps = original_num_steps
 
     for i, pair in enumerate(pairs):
         (paths_fine, paths_coarse), _ = solver.multilevel_solve(trials, pair)
