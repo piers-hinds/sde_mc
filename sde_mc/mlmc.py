@@ -97,5 +97,5 @@ def get_optimal_trials(trials, levels, epsilon, solver, payoff, discounter):
     return optimal_trials.ceil().long().tolist()
 
 
-def mlmc_bs_from_trials(trials, levels, max_mem=5*10**8, dim=1):
-    return torch.minimum(max_mem / (dim * torch.tensor(levels)), trials).ceil().long()
+def mlmc_bs_from_trials(trials, levels, max_mem=5*10**8, dim=1, max_jumps=0):
+    return torch.minimum(max_mem / (dim * (torch.tensor(levels) + max_jumps)), trials).ceil().long()
