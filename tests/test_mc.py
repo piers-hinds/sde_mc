@@ -52,3 +52,12 @@ def test_mc_adaptive_cv(merton_1d_solver, mlps_1d, euro_call, constant_short_rat
     adam = torch.optim.Adam(list(mlps_1d[0].parameters()) + list(mlps_1d[1].parameters()))
     mc_stats = mc_adaptive_cv(mlps_1d, adam, merton_1d_solver, (100, 100), (10, 20), euro_call,
                               constant_short_rate, sim_bs=(100, 100), bs=(10, 10), print_losses=False)
+
+
+def test_mc_terminal_cv(gbm_1d_solver, euro_call, constant_short_rate):
+    mc_stats = mc_terminal_cv(100, gbm_1d_solver, euro_call, constant_short_rate, 10)
+
+
+def test_run_mc_terminal_cv(heston_problem):
+    mc_stats = run_mc_terminal_cv(heston_problem, 0.01, bs=1e3, init_trials=1e4)
+

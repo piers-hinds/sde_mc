@@ -5,7 +5,7 @@ from torch.utils.data import DataLoader
 from .varred import train_diffusion_control_variate, apply_diffusion_control_variate, train_adapted_control_variates, \
     apply_adapted_control_variates, EarlyStopping
 from .nets import NormalJumpsPathData, NormalPathData, AdaptedPathData, Mlp
-from .helpers import partition, mc_estimates, ceil_mult
+from .helpers import partition, mc_estimates, ceil_mult, sample_cov
 from .options import ConstantShortRate
 import gc
 
@@ -326,6 +326,55 @@ def mc_adaptive_cv(models, opt, solver, trials, steps, payoff, discounter, sim_b
     return MCStatistics(mn, sd, train_time + test_time, test_trials)
 
 
+def mc_terminal_cv(num_trials, sde_solver, payoff, discounter=None, bs=None, return_normals=False):
+    """Uses the terminal spot price as a control variate"""
+    if discounter is None:
+        discounter = ConstantShortRate(r=0.0)
+
+    if not bs:
+        start = time.time()
+        out, normals = sde_solver.solve(bs=num_trials, return_normals=return_normals)
+        spots = out[:, -1]
+        payoffs = payoff(spots) * discounter(sde_solver.time_interval)
+        cv = (discounter(sde_solver.time_interval) * spots[:, 0] - sde_solver.sde.init_value[0])
+        b = sample_cov(cv, payoffs) / cv.var()
+        cv_payoffs = payoffs - b * cv
+        mn = cv_payoffs.mean()
+        sd = cv_payoffs.std() / np.sqrt(num_trials)
+        end = time.time()
+        tt = end - start
+
+        return MCStatistics(mn, sd, tt, num_trials, out, payoffs, normals)
+    else:
+        remaining_trials = num_trials
+        sample_sum, sample_sum_sq = 0.0, 0.0
+        start = time.time()
+        first_batch = True
+        while remaining_trials:
+            if remaining_trials < bs:
+                bs = remaining_trials
+
+            remaining_trials -= bs
+            out, normals = sde_solver.solve(bs=bs, return_normals=False)
+            spots = out[:, -1]
+            payoffs = payoff(spots) * discounter(sde_solver.time_interval)
+            cv = (discounter(sde_solver.time_interval) * spots[:, 0] - sde_solver.sde.init_value[0])
+            if first_batch:
+                # estimate b on the first batch
+                b = sample_cov(cv, payoffs) / cv.var()
+                first_batch = False
+            cv_payoffs = payoffs - b * cv
+
+            sample_sum += cv_payoffs.sum()
+            sample_sum_sq += (cv_payoffs**2).sum()
+
+        mn = sample_sum / num_trials
+        sd = torch.sqrt((sample_sum_sq/num_trials - mn**2) * (num_trials / (num_trials-1))) / np.sqrt(num_trials)
+        end = time.time()
+        tt = end-start
+        return MCStatistics(mn, sd, tt, num_trials)
+
+
 def simulate_data(trials, solver, payoff, discounter, bs=1000, inference=False):
     """Simulates trajectories of an SDE and returns the trajectories, payoffs and random variables in a DataLoader
     which can be used for training or inference"""
@@ -378,6 +427,13 @@ def find_num_trials(problem, eps, models=None, init_trials=1e5, bs=1e5):
     return int(trials)
 
 
+def find_num_trials_terminal_cv(problem, eps, init_trials, bs):
+    mc_stats = mc_terminal_cv(init_trials, problem.solver, problem.payoff, problem.discounter, bs)
+    ratio = (mc_stats.sample_std * 1.96 / eps) ** 2
+    trials = np.ceil(ratio * init_trials)
+    return int(trials)
+
+
 def run_mc(problem, eps, bs=1e5, init_trials=1e5):
     trials = find_num_trials(problem, eps, None, init_trials, bs)
     payoff_time = 'adapted' if problem.solver.has_jumps else 'terminal'
@@ -409,3 +465,8 @@ def run_cv_mc(problem, models, opt, eps, train_size, step_factor=30, sim_bs=1e5,
     test_time = mc_stats.time_elapsed
     mc_stats.time_elapsed += train_time_end - train_time_start
     return mc_stats, train_time_end - train_time_start, test_time
+
+
+def run_mc_terminal_cv(problem, eps, bs=1e5, init_trials=1e5):
+    trials = find_num_trials_terminal_cv(problem, eps, init_trials, bs)
+    return mc_terminal_cv(trials, problem.solver, problem.payoff, problem.discounter, bs=bs)

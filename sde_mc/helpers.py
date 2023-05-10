@@ -131,3 +131,8 @@ def get_jump_comp(c_plus, c_minus, alpha, mu, f):
     i3 = quad(lambda x: c_plus * g(x) * inner(x), 0, 1)[0]
     i4 = quad(lambda x: c_plus * q(x) * tail(x), 1, np.inf)[0]
     return i1 + i2 + i3 + i4
+
+
+def sample_cov(x, y):
+    return torch.sum((x - x.mean()) * (y - y.mean())) / (len(x) - 1)
+

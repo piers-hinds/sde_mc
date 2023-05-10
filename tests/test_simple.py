@@ -114,3 +114,9 @@ def icdf():
 @pytest.fixture
 def exp_example_levy():
     return ExpExampleLevy(1, 1, 0.5, 2, 0.02, 0.2, 0.1, 0.01)
+
+
+@pytest.fixture
+def heston_problem():
+    return HestonEuroCall.default_params(100, 'cpu')
+
